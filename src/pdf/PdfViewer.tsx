@@ -10,9 +10,10 @@ interface PdfViewerProps {
   fileData: ArrayBuffer
   onTextSelect?: (text: string, anchor: { page: number; rects: DOMRect[] }) => void
   onPageChange?: (page: number) => void
+  onParagraphsReady?: (paragraphs: { index: number; text: string }[], page: number) => void
 }
 
-export function PdfViewer({ fileData, onTextSelect, onPageChange }: PdfViewerProps) {
+export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsReady }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -42,7 +43,7 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange }: PdfViewerPro
 
     canvas.height = viewport.height
     canvas.width = viewport.width
-    await page.render({ canvasContext: ctx, viewport }).promise
+    await page.render({ canvasContext: ctx, viewport, canvas } as any).promise
 
     const textContent = await page.getTextContent()
     const textLayerDiv = textLayerRefs.current.get(pageNum)
@@ -51,7 +52,7 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange }: PdfViewerPro
       textLayerDiv.style.width = `${viewport.width}px`
       textLayerDiv.style.height = `${viewport.height}px`
 
-      const textItems = textContent.items as pdfjsLib.TextItem[]
+      const textItems = textContent.items as Array<{ str: string; transform: number[]; height: number; fontName: string }>
       for (const item of textItems) {
         const tx = pdfjsLib.Util.transform(viewport.transform, item.transform)
         const span = document.createElement('span')
@@ -64,8 +65,18 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange }: PdfViewerPro
         span.style.transformOrigin = '0% 0%'
         textLayerDiv.appendChild(span)
       }
+
+      if (onParagraphsReady) {
+        const mapped = textItems.map(item => {
+          const t = pdfjsLib.Util.transform(viewport.transform, item.transform)
+          return { str: item.str, height: item.height, y: t[5] }
+        })
+        const { detectParagraphs } = await import('./paragraph')
+        const paragraphs = detectParagraphs(mapped)
+        onParagraphsReady(paragraphs, pageNum)
+      }
     }
-  }, [pdf, scale])
+  }, [pdf, scale, onParagraphsReady])
 
   useEffect(() => {
     if (!pdf) return

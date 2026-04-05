@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Bookshelf } from './bookshelf/Bookshelf'
 import { PdfViewer } from './pdf/PdfViewer'
 import { AiPanel } from './ai/AiPanel'
@@ -177,6 +177,54 @@ export default function App() {
     }
   }, [])
 
+  // Guide mode: paragraph tracking
+  const [currentParagraphs, setCurrentParagraphs] = useState<{ index: number; text: string }[]>([])
+  const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0)
+
+  const handleParagraphsReady = useCallback((paragraphs: { index: number; text: string }[], _page: number) => {
+    setCurrentParagraphs(paragraphs)
+    setCurrentParagraphIndex(0)
+  }, [])
+
+  // Trigger guide when enabled and paragraphs change
+  useEffect(() => {
+    if (!guideEnabled || !currentBook || currentParagraphs.length === 0) return
+
+    const paragraph = currentParagraphs[currentParagraphIndex]
+    if (!paragraph) return
+
+    const cached = getCachedGuide('', currentParagraphIndex)
+    if (cached) {
+      setGuideContent(cached.guideContent)
+      return
+    }
+
+    setGuideLoading(true)
+    setGuideStreamingText('')
+
+    ai.getGuide({
+      bookTitle: currentBook.title,
+      bookAuthor: currentBook.author,
+      currentChapter: '',
+      paragraphs: currentParagraphs.map(p => p.text),
+      currentParagraphIndex,
+      recentGuideSummaries: [],
+    }).then(result => {
+      setGuideContent(result)
+      setGuideLoading(false)
+      addGuide({
+        id: crypto.randomUUID(),
+        bookId,
+        anchor: { chapter: '', paragraph: currentParagraphIndex, textPrefix: '', selectedText: '', textSuffix: '' },
+        guideContent: result,
+        model: loadSettings().model,
+        createdAt: Date.now(),
+      })
+    }).catch(() => {
+      setGuideLoading(false)
+    })
+  }, [guideEnabled, currentParagraphIndex, currentBook, currentParagraphs, getCachedGuide, ai, addGuide, bookId])
+
   const handleExport = useCallback(async () => {
     const db = await createStore()
     const data = await db.exportAll()
@@ -218,6 +266,7 @@ export default function App() {
             <PdfViewer
               fileData={pdfData}
               onTextSelect={handleTextSelect}
+              onParagraphsReady={handleParagraphsReady}
             />
           )}
           <SelectionMenu
