@@ -45,28 +45,22 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
     canvas.width = viewport.width
     await page.render({ canvasContext: ctx, viewport, canvas } as any).promise
 
-    const textContent = await page.getTextContent()
     const textLayerDiv = textLayerRefs.current.get(pageNum)
     if (textLayerDiv) {
       textLayerDiv.innerHTML = ''
       textLayerDiv.style.width = `${viewport.width}px`
       textLayerDiv.style.height = `${viewport.height}px`
 
-      const textItems = textContent.items as Array<{ str: string; transform: number[]; height: number; fontName: string }>
-      for (const item of textItems) {
-        const tx = pdfjsLib.Util.transform(viewport.transform, item.transform)
-        const span = document.createElement('span')
-        span.textContent = item.str
-        span.style.position = 'absolute'
-        span.style.left = `${tx[4]}px`
-        span.style.top = `${tx[5] - item.height}px`
-        span.style.fontSize = `${item.height}px`
-        span.style.fontFamily = item.fontName
-        span.style.transformOrigin = '0% 0%'
-        textLayerDiv.appendChild(span)
-      }
+      const textLayer = new pdfjsLib.TextLayer({
+        textContentSource: page.streamTextContent(),
+        container: textLayerDiv,
+        viewport,
+      })
+      await textLayer.render()
 
       if (onParagraphsReady) {
+        const textContent = await page.getTextContent()
+        const textItems = textContent.items as Array<{ str: string; transform: number[]; height: number }>
         const mapped = textItems.map(item => {
           const t = pdfjsLib.Util.transform(viewport.transform, item.transform)
           return { str: item.str, height: item.height, y: t[5] }
@@ -151,8 +145,7 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
               />
               <div
                 ref={el => { if (el) textLayerRefs.current.set(pageNum, el) }}
-                className="absolute top-0 left-0 select-text"
-                style={{ color: 'transparent' }}
+                className="textLayer"
               />
             </div>
           ))}
