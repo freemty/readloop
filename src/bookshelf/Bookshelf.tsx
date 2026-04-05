@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { BookCard } from './BookCard'
+import { ZlibSearch } from './ZlibSearch'
 import { createStore, type ReadLoopDB } from '../db/store'
 import type { Book } from '../types'
 
@@ -17,6 +18,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
   const [books, setBooks] = useState<Book[]>([])
   const [db, setDb] = useState<ReadLoopDB | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const fileCache = useState<Map<string, ArrayBuffer>>(() => new Map())[0]
 
   useEffect(() => {
@@ -96,6 +98,12 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
       <div className="flex items-center justify-between px-6 py-4 border-b bg-white">
         <h1 className="text-xl font-semibold">ReadLoop</h1>
         <div className="flex gap-2">
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+          >
+            Search Z-Library
+          </button>
           <label className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
             Add PDF
             <input
@@ -139,6 +147,13 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
           </div>
         )}
       </div>
+
+      {searchOpen && (
+        <ZlibSearch
+          onDownloaded={(file) => { setSearchOpen(false); addBook(file) }}
+          onClose={() => setSearchOpen(false)}
+        />
+      )}
     </div>
   )
 }
