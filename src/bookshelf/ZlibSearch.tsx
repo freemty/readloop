@@ -18,6 +18,12 @@ interface ZlibSearchProps {
   onClose: () => void
 }
 
+function decodeHtmlEntities(text: string): string {
+  const el = document.createElement('textarea')
+  el.innerHTML = text
+  return el.value
+}
+
 function parseSearchResults(html: string): SearchResult[] {
   const results: SearchResult[] = []
   const bookRegex = /href="\/book\/([^/]+)\/([^"]+)\.html"/g
@@ -29,7 +35,7 @@ function parseSearchResults(html: string): SearchResult[] {
     results.push({
       id,
       slug,
-      title: decodeURIComponent(slug).replace(/-/g, ' '),
+      title: decodeHtmlEntities(decodeURIComponent(slug).replace(/-/g, ' ')),
       author: '',
       format: '',
       size: '',
@@ -45,10 +51,10 @@ async function fetchBookDetail(bookId: string, slug: string): Promise<{ title: s
   const resp = await fetch(`${PROXY_BASE}/api/book/${bookId}/${slug}.html`)
   const html = await resp.text()
 
-  const titleMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/)
-  const title = titleMatch ? titleMatch[1].trim() : slug.replace(/-/g, ' ')
+  const titleMatch = html.match(/<h1[^>]*class="book-title"[^>]*>([^<]+)<\/h1>/)
+  const title = titleMatch ? decodeHtmlEntities(titleMatch[1].trim()) : decodeURIComponent(slug).replace(/-/g, ' ')
 
-  const authorMatch = html.match(/class="[^"]*author[^"]*"[^>]*>([^<]+)/)
+  const authorMatch = html.match(/<i class="authors"><a[^>]*>([^<]+)<\/a>/)
   const author = authorMatch ? authorMatch[1].trim() : ''
 
   const dlMatch = html.match(/href="\/dl\/([^"]+)"/)
