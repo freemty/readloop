@@ -6,4 +6,9 @@ export default defineConfig({
   optimizeDeps: {
     include: ['pdfjs-dist'],
   },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['fake-indexeddb/auto'],
+  },
 })
