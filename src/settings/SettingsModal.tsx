@@ -15,11 +15,17 @@ interface SettingsModalProps {
 }
 
 const PRESETS: Record<string, { provider: AiProvider; baseUrl: string; model: string; apiKey?: string }> = {
+  bedrock: {
+    provider: 'bedrock',
+    baseUrl: 'http://localhost:3001/api/bedrock/chat',
+    model: 'arn:aws:bedrock:ap-northeast-1:996669628573:application-inference-profile/1kshwq870gk4',
+    apiKey: 'bedrock',
+  },
   yunstorm: {
     provider: 'openai',
-    baseUrl: 'https://dl.yunstorm.com/v1',
+    baseUrl: 'https://gpt.yunstorm.com/v1',
     model: 'claude-sonnet-4',
-    apiKey: 'REDACTED_KEY',
+    apiKey: 'REDACTED_YUNSTORM_KEY',
   },
   openai: {
     provider: 'openai',
@@ -35,7 +41,7 @@ const PRESETS: Record<string, { provider: AiProvider; baseUrl: string; model: st
 
 function loadSettings(): Settings {
   const raw = localStorage.getItem('readloop-settings')
-  if (!raw) return { ...PRESETS.yunstorm, apiKey: PRESETS.yunstorm.apiKey ?? '' }
+  if (!raw) return { ...PRESETS.bedrock, apiKey: PRESETS.bedrock.apiKey ?? '' }
   return JSON.parse(raw) as Settings
 }
 
@@ -76,12 +82,18 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
         <h2 className="text-lg font-semibold mb-4">Settings</h2>
 
         <label className="block text-sm font-medium mb-1">Quick Preset</label>
-        <div className="flex gap-2 mb-3">
+        <div className="flex gap-2 mb-3 flex-wrap">
+          <button
+            onClick={() => handlePreset('bedrock')}
+            className="px-3 py-1.5 text-xs border rounded hover:bg-orange-50 border-orange-300 text-orange-700"
+          >
+            Bedrock Claude
+          </button>
           <button
             onClick={() => handlePreset('yunstorm')}
             className="px-3 py-1.5 text-xs border rounded hover:bg-blue-50 border-blue-300 text-blue-700"
           >
-            Yunstorm (Azure)
+            Yunstorm (Horay)
           </button>
           <button
             onClick={() => handlePreset('openai')}
@@ -103,6 +115,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
           onChange={e => setSettings(prev => ({ ...prev, provider: e.target.value as AiProvider }))}
           className="w-full border rounded px-3 py-2 mb-3"
         >
+          <option value="bedrock">AWS Bedrock (via proxy)</option>
           <option value="openai">OpenAI Compatible</option>
           <option value="claude">Claude Direct</option>
         </select>

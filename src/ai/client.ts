@@ -1,4 +1,4 @@
-export type AiProvider = 'openai' | 'claude'
+export type AiProvider = 'openai' | 'claude' | 'bedrock'
 
 interface AiClientConfig {
   provider: AiProvider
@@ -17,13 +17,23 @@ export interface AiClient {
 }
 
 export function createAiClient(config: AiClientConfig): AiClient {
+  const provider = config.provider
+
+  if (provider === 'bedrock') {
+    const model = config.model ?? 'arn:aws:bedrock:ap-northeast-1:996669628573:application-inference-profile/1kshwq870gk4'
+    const proxyUrl = config.baseUrl ?? 'http://localhost:3001/api/bedrock/chat'
+    return {
+      async chat(messages, onChunk) {
+        return chatBedrock(proxyUrl, model, messages, onChunk)
+      },
+    }
+  }
+
   if (!config.apiKey) {
     throw new Error('API key is required')
   }
 
-  const provider = config.provider
   const model = config.model ?? (provider === 'claude' ? 'claude-sonnet-4-5-20250514' : 'gpt-4o')
-
   const baseUrl = config.baseUrl ?? (provider === 'claude' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1')
 
   return {
@@ -34,6 +44,41 @@ export function createAiClient(config: AiClientConfig): AiClient {
       return chatClaude(baseUrl, config.apiKey, model, messages, onChunk)
     },
   }
+}
+
+async function chatBedrock(
+  proxyUrl: string,
+  model: string,
+  messages: ChatMessage[],
+  onChunk: (text: string) => void,
+): Promise<string> {
+  const systemMsg = messages.find(m => m.role === 'system')
+  const nonSystem = messages.filter(m => m.role !== 'system')
+
+  const response = await fetch(proxyUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      system: systemMsg?.content ?? '',
+      messages: nonSystem.map(m => ({ role: m.role, content: m.content })),
+      max_tokens: 4096,
+      stream: true,
+    }),
+  })
+
+  if (!response.ok) {
+    const err = await response.text()
+    throw new Error(`Bedrock API error: ${response.status} ${err}`)
+  }
+
+  return readSSEStream(response, (data) => {
+    const parsed = JSON.parse(data)
+    if (parsed.type === 'content_block_delta') {
+      return parsed.delta?.text ?? null
+    }
+    return null
+  }, onChunk)
 }
 
 async function chatOpenAI(
@@ -111,7 +156,8 @@ async function readSSEStream(
   extractChunk: (data: string) => string | null,
   onChunk: (text: string) => void,
 ): Promise<string> {
-  const reader = response.body!.getReader()
+  if (!response.body) throw new Error('Response body is null')
+  const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let full = ''
   let buffer = ''
