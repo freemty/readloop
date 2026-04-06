@@ -11,7 +11,7 @@ export interface Book {
   id: string
   title: string
   author: string
-  format: 'pdf'
+  format: 'pdf' | 'epub'
   fileHash: string
   lastReadAnchor?: PositionAnchor
   createdAt: number

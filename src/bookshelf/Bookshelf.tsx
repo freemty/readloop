@@ -57,11 +57,12 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
       return
     }
 
+    const format = file.name.toLowerCase().endsWith('.epub') ? 'epub' as const : 'pdf' as const
     const book: Book = {
       id: crypto.randomUUID(),
-      title: file.name.replace(/\.pdf$/i, ''),
+      title: file.name.replace(/\.(pdf|epub)$/i, ''),
       author: '',
-      format: 'pdf',
+      format,
       fileHash,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -85,7 +86,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
     e.preventDefault()
     setIsDragging(false)
     const file = e.dataTransfer.files[0]
-    if (file?.type === 'application/pdf') addBook(file)
+    if (file?.type === 'application/pdf' || file?.type === 'application/epub+zip' || file?.name.endsWith('.epub')) addBook(file)
   }, [addBook])
 
   const openExistingBook = useCallback(async (bookId: string) => {
@@ -104,7 +105,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
     }
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = '.pdf'
+    input.accept = '.pdf,.epub'
     input.onchange = async () => {
       const file = input.files?.[0]
       if (!file) return
@@ -168,10 +169,10 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
             }}
           >
             <Plus size={14} strokeWidth={2} />
-            Add PDF
+            Add Book
             <input
               type="file"
-              accept=".pdf"
+              accept=".pdf,.epub"
               className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) addBook(f) }}
             />

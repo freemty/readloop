@@ -12,6 +12,7 @@
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1024.0",
     "@smithy/node-http-handler": "^4.5.1",
+    "epubjs": "^0.3.93",
     "framer-motion": "^12.38.0",
     "https-proxy-agent": "^9.0.0",
     "idb": "^8.0.3",

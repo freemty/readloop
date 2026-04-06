@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bookshelf } from './bookshelf/Bookshelf'
 import { PdfViewer } from './pdf/PdfViewer'
+import { EpubViewer } from './epub/EpubViewer'
 import { AiPanel } from './ai/AiPanel'
 import { Sidebar } from './layout/Sidebar'
 import { Toolbar } from './layout/Toolbar'
@@ -275,13 +276,19 @@ export default function App() {
               onBackToShelf={() => { setView('bookshelf'); setCurrentBook(null); setPdfData(null) }}
             />
             <div className="flex-1 relative">
-              {pdfData && (
+              {pdfData && currentBook?.format === 'epub' ? (
+                <EpubViewer
+                  fileData={pdfData}
+                  onTextSelect={handleTextSelect}
+                  onParagraphsReady={handleParagraphsReady}
+                />
+              ) : pdfData ? (
                 <PdfViewer
                   fileData={pdfData}
                   onTextSelect={handleTextSelect}
                   onParagraphsReady={handleParagraphsReady}
                 />
-              )}
+              ) : null}
               <SelectionMenu
                 position={selectionMenuPos}
                 onAskAi={handleAskAi}

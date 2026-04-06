@@ -116,7 +116,7 @@ export function ZlibSearch({ onDownloaded, onClose }: ZlibSearchProps) {
     setResults([])
 
     try {
-      const resp = await fetch(`${PROXY_BASE}/api/search?q=${encodeURIComponent(query)}&ext=pdf`)
+      const resp = await fetch(`${PROXY_BASE}/api/search?q=${encodeURIComponent(query)}`)
       if (!resp.ok) throw new Error(`Search failed: ${resp.status}`)
       const html = await resp.text()
       const parsed = parseSearchResults(html)
@@ -154,8 +154,11 @@ export function ZlibSearch({ onDownloaded, onClose }: ZlibSearchProps) {
       if (!resp.ok) throw new Error(`Download failed: ${resp.status}`)
 
       const blob = await resp.blob()
-      const filename = `${result.title || result.slug}.pdf`
-      const file = new File([blob], filename, { type: 'application/pdf' })
+      const isEpub = result.format.toUpperCase() === 'EPUB'
+      const ext = isEpub ? '.epub' : '.pdf'
+      const mimeType = isEpub ? 'application/epub+zip' : 'application/pdf'
+      const filename = `${result.title || result.slug}${ext}`
+      const file = new File([blob], filename, { type: mimeType })
       onDownloaded(file)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Download failed')
