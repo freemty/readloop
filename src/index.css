@@ -1,2 +1,17 @@
 @import "tailwindcss";
 @import "pdfjs-dist/web/pdf_viewer.css";
+
+/* pdf_viewer.css sets span { color: transparent } inside .textLayer,
+   but Tailwind v4 layer ordering can leak it globally.
+   Force explicit text color on all non-textLayer content. */
+body {
+  color: #111;
+}
+
+h1, h2, h3, h4, h5, h6, p, span, div, button, input, select, label, a, li, td, th {
+  color: inherit;
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+}
