@@ -36,6 +36,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
     const existing = books.find(b => b.fileHash === fileHash)
     if (existing) {
       fileCache.set(existing.id, buffer)
+      await db.saveFileData(existing.id, buffer)
       onOpenBook(existing.id, buffer)
       return
     }
@@ -50,6 +51,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
       updatedAt: Date.now(),
     }
     await db.addBook(book)
+    await db.saveFileData(book.id, buffer)
     fileCache.set(book.id, buffer)
     setBooks(prev => [...prev, book])
     onOpenBook(book.id, buffer)
@@ -58,6 +60,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
   const deleteBook = useCallback(async (bookId: string) => {
     if (!db) return
     await db.deleteBook(bookId)
+    await db.deleteFileData(bookId)
     setBooks(prev => prev.filter(b => b.id !== bookId))
     fileCache.delete(bookId)
   }, [db, fileCache])
@@ -70,11 +73,22 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
   }, [addBook])
 
   const openExistingBook = useCallback(async (bookId: string) => {
+    // Try memory cache first
     const cached = fileCache.get(bookId)
     if (cached) {
       onOpenBook(bookId, cached)
       return
     }
+    // Try IndexedDB
+    if (db) {
+      const stored = await db.getFileData(bookId)
+      if (stored) {
+        fileCache.set(bookId, stored)
+        onOpenBook(bookId, stored)
+        return
+      }
+    }
+    // Fallback: ask user to re-select file
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.pdf'
@@ -83,10 +97,11 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
       if (!file) return
       const buffer = await file.arrayBuffer()
       fileCache.set(bookId, buffer)
+      if (db) await db.saveFileData(bookId, buffer)
       onOpenBook(bookId, buffer)
     }
     input.click()
-  }, [fileCache, onOpenBook])
+  }, [db, fileCache, onOpenBook])
 
   return (
     <div

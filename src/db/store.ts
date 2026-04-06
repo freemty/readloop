@@ -1,10 +1,16 @@
 import { openDB, type IDBPDatabase } from 'idb'
 import type { Book, Annotation, GuideCache } from '../types'
 
+interface FileData {
+  bookId: string
+  data: ArrayBuffer
+}
+
 interface ReadLoopSchema {
   books: { key: string; value: Book }
   annotations: { key: string; value: Annotation; indexes: { byBook: string } }
   guideCache: { key: string; value: GuideCache; indexes: { byBook: string } }
+  fileData: { key: string; value: FileData }
 }
 
 export interface ReadLoopDB {
@@ -22,19 +28,26 @@ export interface ReadLoopDB {
   addGuideCache(entry: GuideCache): Promise<void>
   getGuideCacheByBook(bookId: string): Promise<GuideCache[]>
 
+  saveFileData(bookId: string, data: ArrayBuffer): Promise<void>
+  getFileData(bookId: string): Promise<ArrayBuffer | undefined>
+  deleteFileData(bookId: string): Promise<void>
+
   exportAll(): Promise<{ books: Book[]; annotations: Annotation[]; guideCache: GuideCache[] }>
 }
 
 export async function createStore(name = 'readloop'): Promise<ReadLoopDB> {
-  const db: IDBPDatabase<ReadLoopSchema> = await openDB<ReadLoopSchema>(name, 1, {
-    upgrade(database) {
-      database.createObjectStore('books', { keyPath: 'id' })
-
-      const annStore = database.createObjectStore('annotations', { keyPath: 'id' })
-      annStore.createIndex('byBook', 'bookId')
-
-      const guideStore = database.createObjectStore('guideCache', { keyPath: 'id' })
-      guideStore.createIndex('byBook', 'bookId')
+  const db: IDBPDatabase<ReadLoopSchema> = await openDB<ReadLoopSchema>(name, 2, {
+    upgrade(database, oldVersion) {
+      if (oldVersion < 1) {
+        database.createObjectStore('books', { keyPath: 'id' })
+        const annStore = database.createObjectStore('annotations', { keyPath: 'id' })
+        annStore.createIndex('byBook', 'bookId')
+        const guideStore = database.createObjectStore('guideCache', { keyPath: 'id' })
+        guideStore.createIndex('byBook', 'bookId')
+      }
+      if (oldVersion < 2) {
+        database.createObjectStore('fileData', { keyPath: 'bookId' })
+      }
     },
   })
 
@@ -73,6 +86,17 @@ export async function createStore(name = 'readloop'): Promise<ReadLoopDB> {
     },
     async getGuideCacheByBook(bookId) {
       return db.getAllFromIndex('guideCache', 'byBook', bookId)
+    },
+
+    async saveFileData(bookId, data) {
+      await db.put('fileData', { bookId, data })
+    },
+    async getFileData(bookId) {
+      const entry = await db.get('fileData', bookId)
+      return entry?.data
+    },
+    async deleteFileData(bookId) {
+      await db.delete('fileData', bookId)
     },
 
     async exportAll() {
