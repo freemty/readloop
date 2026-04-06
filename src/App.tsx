@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Bookshelf } from './bookshelf/Bookshelf'
 import { PdfViewer } from './pdf/PdfViewer'
 import { AiPanel } from './ai/AiPanel'
@@ -237,63 +238,83 @@ export default function App() {
     URL.revokeObjectURL(url)
   }, [])
 
-  if (view === 'bookshelf') {
-    return (
-      <>
-        <Bookshelf onOpenBook={handleOpenBook} onOpenSettings={() => setSettingsOpen(true)} />
-        <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSave={() => {}} />
-      </>
-    )
-  }
-
   return (
-    <div className="h-screen flex flex-col">
-      <Toolbar
-        guideEnabled={guideEnabled}
-        onToggleGuide={() => setGuideEnabled(prev => !prev)}
-        onExport={handleExport}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
-      <div className="flex-1 flex min-h-0">
-        <Sidebar
-          bookTitle={currentBook?.title ?? 'Untitled'}
-          annotations={annotations}
-          onAnnotationSelect={handleAnnotationSelect}
-          onBackToShelf={() => { setView('bookshelf'); setCurrentBook(null); setPdfData(null) }}
-        />
-        <div className="flex-1 relative">
-          {pdfData && (
-            <PdfViewer
-              fileData={pdfData}
-              onTextSelect={handleTextSelect}
-              onParagraphsReady={handleParagraphsReady}
-            />
-          )}
-          <SelectionMenu
-            position={selectionMenuPos}
-            onAskAi={handleAskAi}
-            onHighlight={handleHighlight}
-            onNote={handleNote}
-            onDismiss={() => setSelectionMenuPos(null)}
-          />
-        </div>
-        <div className="w-80 border-l bg-white">
-          <AiPanel
+    <AnimatePresence mode="wait">
+      {view === 'bookshelf' ? (
+        <motion.div
+          key="bookshelf"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          className="h-screen"
+        >
+          <Bookshelf onOpenBook={handleOpenBook} onOpenSettings={() => setSettingsOpen(true)} />
+          <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSave={() => {}} />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="reader"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
+          className="h-screen flex flex-col"
+        >
+          <Toolbar
             guideEnabled={guideEnabled}
-            guideContent={guideContent}
-            guideLoading={guideLoading}
-            guideStreamingText={guideStreamingText}
-            onDismissGuide={() => setGuideContent(null)}
-            activeConversation={activeConversation}
-            conversationLoading={ai.isLoading}
-            conversationStreamingText={ai.streamingText}
-            conversationError={ai.error}
-            onSendMessage={handleSendMessage}
-            onCloseConversation={() => { setActiveConversation(null); setActiveAnnotationId(null) }}
+            onToggleGuide={() => setGuideEnabled(prev => !prev)}
+            onExport={handleExport}
+            onOpenSettings={() => setSettingsOpen(true)}
           />
-        </div>
-      </div>
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSave={() => {}} />
-    </div>
+          <div className="flex-1 flex min-h-0">
+            <Sidebar
+              bookTitle={currentBook?.title ?? 'Untitled'}
+              annotations={annotations}
+              onAnnotationSelect={handleAnnotationSelect}
+              onBackToShelf={() => { setView('bookshelf'); setCurrentBook(null); setPdfData(null) }}
+            />
+            <div className="flex-1 relative">
+              {pdfData && (
+                <PdfViewer
+                  fileData={pdfData}
+                  onTextSelect={handleTextSelect}
+                  onParagraphsReady={handleParagraphsReady}
+                />
+              )}
+              <SelectionMenu
+                position={selectionMenuPos}
+                onAskAi={handleAskAi}
+                onHighlight={handleHighlight}
+                onNote={handleNote}
+                onDismiss={() => setSelectionMenuPos(null)}
+              />
+            </div>
+            <div
+              className="w-80"
+              style={{
+                borderLeft: '1px solid var(--border)',
+                background: 'var(--bg-paper)',
+              }}
+            >
+              <AiPanel
+                guideEnabled={guideEnabled}
+                guideContent={guideContent}
+                guideLoading={guideLoading}
+                guideStreamingText={guideStreamingText}
+                onDismissGuide={() => setGuideContent(null)}
+                activeConversation={activeConversation}
+                conversationLoading={ai.isLoading}
+                conversationStreamingText={ai.streamingText}
+                conversationError={ai.error}
+                onSendMessage={handleSendMessage}
+                onCloseConversation={() => { setActiveConversation(null); setActiveAnnotationId(null) }}
+              />
+            </div>
+          </div>
+          <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSave={() => {}} />
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
