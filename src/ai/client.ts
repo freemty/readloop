@@ -4,6 +4,7 @@ interface AiClientConfig {
   provider: AiProvider
   apiKey: string
   model?: string
+  baseUrl?: string
 }
 
 interface ChatMessage {
@@ -23,23 +24,27 @@ export function createAiClient(config: AiClientConfig): AiClient {
   const provider = config.provider
   const model = config.model ?? (provider === 'claude' ? 'claude-sonnet-4-5-20250514' : 'gpt-4o')
 
+  const baseUrl = config.baseUrl ?? (provider === 'claude' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1')
+
   return {
     async chat(messages, onChunk) {
       if (provider === 'openai') {
-        return chatOpenAI(config.apiKey, model, messages, onChunk)
+        return chatOpenAI(baseUrl, config.apiKey, model, messages, onChunk)
       }
-      return chatClaude(config.apiKey, model, messages, onChunk)
+      return chatClaude(baseUrl, config.apiKey, model, messages, onChunk)
     },
   }
 }
 
 async function chatOpenAI(
+  baseUrl: string,
   apiKey: string,
   model: string,
   messages: ChatMessage[],
   onChunk: (text: string) => void,
 ): Promise<string> {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const url = baseUrl.endsWith('/v1') ? `${baseUrl}/chat/completions` : `${baseUrl}/v1/chat/completions`
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -61,6 +66,7 @@ async function chatOpenAI(
 }
 
 async function chatClaude(
+  baseUrl: string,
   apiKey: string,
   model: string,
   messages: ChatMessage[],
@@ -69,7 +75,7 @@ async function chatClaude(
   const systemMsg = messages.find(m => m.role === 'system')
   const nonSystem = messages.filter(m => m.role !== 'system')
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch(`${baseUrl}/v1/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
