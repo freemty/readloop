@@ -17,8 +17,8 @@ import { NodeHttpHandler } from '@smithy/node-http-handler'
 const bedrockClient = new BedrockRuntimeClient({
   region: process.env.AWS_REGION || 'ap-northeast-1',
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'REDACTED_AK',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'REDACTED_SK',
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
   requestHandler: new NodeHttpHandler({
     httpsAgent: agent,
@@ -61,16 +61,7 @@ async function handleBedrockChat(req, res) {
       for await (const event of response.body) {
         if (event.chunk) {
           const decoded = JSON.parse(new TextDecoder().decode(event.chunk.bytes))
-          // Convert Bedrock response to Anthropic SSE format
-          if (decoded.type === 'content_block_delta') {
-            res.write(`data: ${JSON.stringify(decoded)}\n\n`)
-          } else if (decoded.type === 'content_block_start') {
-            res.write(`data: ${JSON.stringify(decoded)}\n\n`)
-          } else if (decoded.type === 'message_start') {
-            res.write(`data: ${JSON.stringify(decoded)}\n\n`)
-          } else if (decoded.type === 'message_delta') {
-            res.write(`data: ${JSON.stringify(decoded)}\n\n`)
-          } else if (decoded.type === 'message_stop') {
+          if (decoded.type) {
             res.write(`data: ${JSON.stringify(decoded)}\n\n`)
           }
         }

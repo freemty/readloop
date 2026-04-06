@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { BookCard } from './BookCard'
 import { ZlibSearch } from './ZlibSearch'
 import { createStore, type ReadLoopDB } from '../db/store'
@@ -19,7 +19,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
   const [db, setDb] = useState<ReadLoopDB | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const fileCache = useState<Map<string, ArrayBuffer>>(() => new Map())[0]
+  const fileCache = useRef(new Map<string, ArrayBuffer>()).current
 
   useEffect(() => {
     createStore().then(store => {

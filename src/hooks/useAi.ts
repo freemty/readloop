@@ -44,7 +44,7 @@ export function useAi(): UseAiReturn {
     userPrompt: string,
   ): Promise<string> => {
     const settings = loadSettings()
-    if (!settings.apiKey) {
+    if (settings.provider !== 'bedrock' && !settings.apiKey) {
       throw new Error('Please configure your API key in Settings')
     }
 

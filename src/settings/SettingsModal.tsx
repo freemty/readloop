@@ -25,7 +25,7 @@ const PRESETS: Record<string, { provider: AiProvider; baseUrl: string; model: st
     provider: 'openai',
     baseUrl: 'https://gpt.yunstorm.com/v1',
     model: 'claude-sonnet-4',
-    apiKey: 'REDACTED_YUNSTORM_KEY',
+    apiKey: import.meta.env.VITE_YUNSTORM_API_KEY ?? '',
   },
   openai: {
     provider: 'openai',
