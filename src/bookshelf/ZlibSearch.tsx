@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { X, Search, Download } from 'lucide-react'
 
 const PROXY_BASE = 'http://localhost:3001'
 
@@ -69,6 +71,37 @@ async function fetchBookDetail(bookId: string, slug: string): Promise<{ title: s
   return { title, author, format, size, dlId }
 }
 
+// Loading spinner dots
+function LoadingDots() {
+  return (
+    <div className="flex items-center gap-1.5 justify-center py-2">
+      {[0, 1, 2].map(i => (
+        <motion.span
+          key={i}
+          className="block rounded-full"
+          style={{ width: 6, height: 6, background: '#fff' }}
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{
+            duration: 1.1,
+            repeat: Infinity,
+            delay: i * 0.2,
+            ease: 'easeInOut',
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+const resultVariants = {
+  hidden: { opacity: 0, y: 8 },
+  show: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.24, delay: i * 0.05, ease: 'easeOut' },
+  }),
+}
+
 export function ZlibSearch({ onDownloaded, onClose }: ZlibSearchProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -88,7 +121,6 @@ export function ZlibSearch({ onDownloaded, onClose }: ZlibSearchProps) {
       const html = await resp.text()
       const parsed = parseSearchResults(html)
 
-      // Fetch details for top 10 results
       const detailed = await Promise.all(
         parsed.slice(0, 10).map(async (r) => {
           try {
@@ -133,67 +165,190 @@ export function ZlibSearch({ onDownloaded, onClose }: ZlibSearchProps) {
   }, [onDownloaded])
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-[640px] max-h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h2 className="font-semibold">Search Z-Library</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">X</button>
-        </div>
+    <>
+      {/* Backdrop */}
+      <motion.div
+        className="fixed inset-0 z-40"
+        style={{ background: 'rgba(0,0,0,0.45)' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={onClose}
+      />
 
-        <div className="px-4 py-3 border-b">
-          <form onSubmit={e => { e.preventDefault(); handleSearch() }} className="flex gap-2">
-            <input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search books..."
-              className="flex-1 border rounded px-3 py-2 text-sm"
-              autoFocus
-            />
-            <button
-              type="submit"
-              disabled={loading || !query.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+      {/* Modal */}
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+      >
+        <motion.div
+          className="pointer-events-auto flex flex-col"
+          style={{
+            background: 'var(--bg-card)',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: 'var(--shadow-3)',
+            width: 640,
+            maxHeight: '80vh',
+            overflow: 'hidden',
+          }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+        >
+          {/* Modal header */}
+          <div
+            className="flex items-center justify-between px-5 py-4"
+            style={{ borderBottom: '1px solid var(--border)' }}
+          >
+            <h2
+              className="font-semibold text-base"
+              style={{
+                fontFamily: 'var(--font-serif)',
+                color: 'var(--text-primary)',
+              }}
             >
-              {loading ? 'Searching...' : 'Search'}
-            </button>
-          </form>
-        </div>
+              Search Z-Library
+            </h2>
+            <motion.button
+              onClick={onClose}
+              whileHover={{ background: 'var(--bg-paper)' }}
+              whileTap={{ scale: 0.93 }}
+              className="flex items-center justify-center rounded-full"
+              style={{
+                width: 30,
+                height: 30,
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <X size={16} strokeWidth={2} />
+            </motion.button>
+          </div>
 
-        {error && (
-          <div className="px-4 py-2 bg-red-50 text-red-600 text-sm">{error}</div>
-        )}
+          {/* Search input */}
+          <div
+            className="px-5 py-3"
+            style={{ borderBottom: '1px solid var(--border)' }}
+          >
+            <form
+              onSubmit={e => { e.preventDefault(); handleSearch() }}
+              className="flex gap-2"
+            >
+              <input
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search books..."
+                className="flex-1 rounded-lg px-3 py-2 text-sm outline-none"
+                style={{
+                  border: '1.5px solid var(--border)',
+                  color: 'var(--text-primary)',
+                  background: 'var(--bg-paper)',
+                  fontFamily: 'var(--font-ui)',
+                }}
+                autoFocus
+              />
+              <motion.button
+                type="submit"
+                disabled={loading || !query.trim()}
+                whileHover={{ opacity: 0.88 }}
+                whileTap={{ scale: 0.96 }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-40"
+                style={{
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  fontFamily: 'var(--font-ui)',
+                  minWidth: 90,
+                  justifyContent: 'center',
+                }}
+              >
+                {loading ? <LoadingDots /> : (
+                  <>
+                    <Search size={13} strokeWidth={2} />
+                    Search
+                  </>
+                )}
+              </motion.button>
+            </form>
+          </div>
 
-        <div className="flex-1 overflow-auto">
-          {results.length === 0 && !loading && (
-            <div className="flex items-center justify-center h-40 text-gray-400 text-sm">
-              {query ? 'No results' : 'Enter a book title to search'}
+          {/* Error */}
+          {error && (
+            <div
+              className="px-5 py-2 text-sm"
+              style={{ background: '#FEF2F2', color: '#DC2626' }}
+            >
+              {error}
             </div>
           )}
 
-          {results.map(r => (
-            <div
-              key={r.id}
-              className="px-4 py-3 border-b hover:bg-gray-50 flex items-center justify-between"
-            >
-              <div className="flex-1 min-w-0 mr-3">
-                <div className="font-medium text-sm truncate">{r.title}</div>
-                <div className="text-xs text-gray-500 truncate">
-                  {r.author || 'Unknown author'}
-                  {r.size && ` · ${r.size}`}
-                  {r.format && ` · ${r.format}`}
-                </div>
-              </div>
-              <button
-                onClick={() => handleDownload(r)}
-                disabled={downloading === r.id || !r.dlId}
-                className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+          {/* Results */}
+          <div className="flex-1 overflow-auto">
+            {results.length === 0 && !loading && (
+              <div
+                className="flex items-center justify-center text-sm"
+                style={{ height: 160, color: 'var(--text-muted)' }}
               >
-                {downloading === r.id ? 'Downloading...' : r.dlId ? 'Download' : 'N/A'}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+                {query ? 'No results' : 'Enter a book title to search'}
+              </div>
+            )}
+
+            {results.map((r, i) => (
+              <motion.div
+                key={r.id}
+                custom={i}
+                variants={resultVariants}
+                initial="hidden"
+                animate="show"
+                className="flex items-center justify-between px-5 py-3"
+                style={{ borderBottom: '1px solid var(--border)' }}
+                whileHover={{ background: 'var(--bg-paper)' }}
+              >
+                <div className="flex-1 min-w-0 mr-3">
+                  <div
+                    className="text-sm truncate font-medium"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {r.title}
+                  </div>
+                  <div
+                    className="text-xs truncate mt-0.5"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    {r.author || 'Unknown author'}
+                    {r.size && ` · ${r.size}`}
+                    {r.format && ` · ${r.format}`}
+                  </div>
+                </div>
+
+                <motion.button
+                  onClick={() => handleDownload(r)}
+                  disabled={downloading === r.id || !r.dlId}
+                  whileHover={{ opacity: 0.85 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-40 whitespace-nowrap"
+                  style={{
+                    background: r.dlId ? 'var(--accent)' : 'var(--bg-paper)',
+                    color: r.dlId ? '#fff' : 'var(--text-muted)',
+                    border: r.dlId ? 'none' : '1px solid var(--border)',
+                    fontFamily: 'var(--font-ui)',
+                  }}
+                >
+                  {downloading === r.id ? (
+                    <LoadingDots />
+                  ) : r.dlId ? (
+                    <>
+                      <Download size={12} strokeWidth={2} />
+                      Download
+                    </>
+                  ) : (
+                    'N/A'
+                  )}
+                </motion.button>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      </motion.div>
+    </>
   )
 }
