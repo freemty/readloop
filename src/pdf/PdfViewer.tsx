@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { ZoomIn, ZoomOut } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -118,28 +119,84 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
     return () => document.removeEventListener('mouseup', handleMouseUp)
   }, [currentPage, onTextSelect])
 
+  const ghostButtonStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '1.75rem',
+    height: '1.75rem',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    background: 'transparent',
+    color: 'var(--text-secondary)',
+    cursor: 'pointer',
+    transition: 'background 0.12s, color 0.12s',
+  }
+
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-gray-50 text-sm">
-        <span>Page {currentPage} / {totalPages}</span>
-        <button
-          onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
-          className="px-2 py-1 rounded hover:bg-gray-200"
+      {/* Toolbar */}
+      <div
+        className="flex items-center gap-2 px-4 py-2"
+        style={{
+          background: 'var(--bg-card)',
+          borderBottom: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-1)',
+        }}
+      >
+        <span
+          style={{
+            fontSize: '0.8rem',
+            fontFamily: 'var(--font-ui)',
+            color: 'var(--text-secondary)',
+          }}
         >
-          -
-        </button>
-        <span>{Math.round(scale * 100)}%</span>
-        <button
-          onClick={() => setScale(s => Math.min(3, s + 0.25))}
-          className="px-2 py-1 rounded hover:bg-gray-200"
-        >
-          +
-        </button>
+          Page {currentPage} / {totalPages}
+        </span>
+
+        <div className="flex items-center gap-1" style={{ marginLeft: 'auto' }}>
+          <button
+            onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
+            style={ghostButtonStyle}
+            title="Zoom out"
+          >
+            <ZoomOut size={13} strokeWidth={2} />
+          </button>
+          <span
+            style={{
+              fontSize: '0.75rem',
+              fontFamily: 'var(--font-ui)',
+              color: 'var(--text-secondary)',
+              minWidth: '3rem',
+              textAlign: 'center',
+            }}
+          >
+            {Math.round(scale * 100)}%
+          </span>
+          <button
+            onClick={() => setScale(s => Math.min(3, s + 0.25))}
+            style={ghostButtonStyle}
+            title="Zoom in"
+          >
+            <ZoomIn size={13} strokeWidth={2} />
+          </button>
+        </div>
       </div>
-      <div ref={containerRef} className="flex-1 overflow-auto bg-gray-100">
-        <div className="flex flex-col items-center gap-4 py-4">
+
+      {/* PDF container */}
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-auto"
+        style={{ background: 'var(--bg-paper)' }}
+      >
+        <div className="flex flex-col items-center gap-4 py-6">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
-            <div key={pageNum} data-page={pageNum} className="relative shadow-lg bg-white">
+            <div
+              key={pageNum}
+              data-page={pageNum}
+              className="relative bg-white"
+              style={{ boxShadow: 'var(--shadow-1)' }}
+            >
               <canvas
                 ref={el => { if (el) canvasRefs.current.set(pageNum, el) }}
               />
