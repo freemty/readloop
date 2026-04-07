@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Settings, X } from 'lucide-react'
+import { Settings as SettingsIcon, X } from 'lucide-react'
 import type { AiProvider } from '../ai/client'
 
 interface Settings {
@@ -147,7 +147,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
-                  <Settings size={16} style={{ color: 'var(--accent)' }} strokeWidth={2} />
+                  <SettingsIcon size={16} style={{ color: 'var(--accent)' }} strokeWidth={2} />
                   <h2
                     style={{
                       fontSize: '1rem',
