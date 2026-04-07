@@ -40,3 +40,7 @@ export function guideSystemPrompt(bookTitle: string, bookAuthor: string): string
 
 Keep it concise. Use the same language as the book text.`
 }
+
+export function screenshotSystemPrompt(bookTitle: string): string {
+  return `You are analyzing a screenshot from "${bookTitle}". Describe what you see and answer the user's question. Be concise. Answer in the same language as the book text.`
+}

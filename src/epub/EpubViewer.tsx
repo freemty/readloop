@@ -137,15 +137,11 @@ export function EpubViewer({
       setToc(nav.toc)
     })
 
-    // Content hook — inject mouseup listener and render highlights in each iframe
+    // Content hook — inject mouseup listener into each iframe
+    // (highlights are applied by the separate externalAnnotations effect)
     rendition.hooks.content.register((contents: { window: Window; document: Document }) => {
       const iframeDoc = contents.document
       const iframeWin = contents.window
-
-      // Render highlights from annotations
-      if (externalAnnotations) {
-        applyHighlightsToDoc(iframeDoc, externalAnnotations)
-      }
 
       iframeDoc.addEventListener('mouseup', () => {
         setTimeout(() => {

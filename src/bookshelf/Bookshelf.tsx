@@ -51,51 +51,51 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
     if (!db || books.length === 0) return
     let cancelled = false
     const loadCovers = async () => {
-      const entries = await Promise.all(
-        books.map(async (book): Promise<[string, string] | null> => {
-          let coverData = await db.getCoverImage(book.id)
-
-          // Auto-extract cover for EPUB books that don't have one yet
-          if (!coverData && book.format === 'epub') {
-            try {
-              const fileData = await db.getFileData(book.id)
-              if (fileData) {
-                const ePubLib = await import('epubjs')
-                const epubBook = ePubLib.default(fileData.slice(0))
-                await epubBook.ready
-                const coverUrl = await epubBook.coverUrl()
-                if (coverUrl) {
-                  const resp = await fetch(coverUrl)
-                  coverData = await resp.arrayBuffer()
-                  await db.saveCoverImage(book.id, coverData)
-                }
-                epubBook.destroy()
-              }
-            } catch {}
-          }
-
-          if (!coverData) return null
-          const blob = new Blob([coverData])
-          return [book.id, URL.createObjectURL(blob)]
-        })
-      )
-      if (cancelled) {
-        // Revoke any URLs we just created since component unmounted
-        for (const entry of entries) {
-          if (entry) URL.revokeObjectURL(entry[1])
-        }
-        return
-      }
-      const newCovers = new Map<string, string>()
-      for (const entry of entries) {
-        if (entry) newCovers.set(entry[0], entry[1])
-      }
+      // Only load covers for books we don't already have
       setCovers(prev => {
-        // Revoke old URLs that are being replaced
-        for (const [, url] of prev) {
-          URL.revokeObjectURL(url)
-        }
-        return newCovers
+        const missing = books.filter(b => !prev.has(b.id))
+        if (missing.length === 0) return prev
+
+        // Load async, merge incrementally
+        Promise.all(
+          missing.map(async (book): Promise<[string, string] | null> => {
+            let coverData = await db.getCoverImage(book.id)
+
+            if (!coverData && book.format === 'epub') {
+              try {
+                const fileData = await db.getFileData(book.id)
+                if (fileData) {
+                  const ePubLib = await import('epubjs')
+                  const epubBook = ePubLib.default(fileData.slice(0))
+                  await epubBook.ready
+                  const coverUrl = await epubBook.coverUrl()
+                  if (coverUrl) {
+                    const resp = await fetch(coverUrl)
+                    coverData = await resp.arrayBuffer()
+                    await db.saveCoverImage(book.id, coverData)
+                  }
+                  epubBook.destroy()
+                }
+              } catch {}
+            }
+
+            if (!coverData) return null
+            const blob = new Blob([coverData])
+            return [book.id, URL.createObjectURL(blob)]
+          })
+        ).then(entries => {
+          if (cancelled) {
+            for (const e of entries) { if (e) URL.revokeObjectURL(e[1]) }
+            return
+          }
+          setCovers(prev2 => {
+            const next = new Map(prev2)
+            for (const e of entries) { if (e) next.set(e[0], e[1]) }
+            return next
+          })
+        })
+
+        return prev
       })
     }
     loadCovers()

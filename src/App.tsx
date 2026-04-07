@@ -13,7 +13,7 @@ import { useAi } from './hooks/useAi'
 import { useGuideCache } from './hooks/useGuideCache'
 import { createAnchor } from './pdf/anchor'
 import { getStore } from './db/store'
-import type { AiMode } from './ai/prompts'
+import { screenshotSystemPrompt, type AiMode } from './ai/prompts'
 import type { AppView, Annotation, Book, Message } from './types'
 import type { ScreenshotBbox } from './pdf/ScreenshotTool'
 
@@ -31,7 +31,6 @@ export default function App() {
   const [selectedText, setSelectedText] = useState('')
   const [selectionPage, setSelectionPage] = useState(0)
 
-  // AI mode (persisted)
   const [aiMode, setAiMode] = useState<AiMode>(() => (localStorage.getItem('readloop-ai-mode') as AiMode) || 'intellectual')
   const handleAiModeChange = useCallback((mode: AiMode) => {
     setAiMode(mode)
@@ -52,8 +51,14 @@ export default function App() {
   const [currentParagraphs, setCurrentParagraphs] = useState<{ index: number; text: string }[]>([])
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0)
 
-  // Annotation jump
   const [jumpToText, setJumpToText] = useState<string | null>(null)
+
+  // Auto-clear jumpToText after it's consumed
+  useEffect(() => {
+    if (!jumpToText) return
+    const timer = setTimeout(() => setJumpToText(null), 300)
+    return () => clearTimeout(timer)
+  }, [jumpToText])
 
   // Hooks
   const bookId = currentBook?.id ?? ''
@@ -107,7 +112,6 @@ export default function App() {
 
   const handleAskCurrentPage = useCallback((query: string) => {
     if (!currentBook) return
-    // Create a new conversation using current page paragraphs as context
     const pageText = currentParagraphs.map(p => p.text).join('\n')
     setSelectedText(pageText.slice(0, 500))
     setActiveConversation([])
@@ -190,7 +194,7 @@ export default function App() {
     setSelectedText(regionDesc)
     setActiveConversation([userMsg])
 
-    const systemPrompt = `You are analyzing a screenshot from "${currentBook.title}". Describe what you see and answer the user's question. Be concise. Answer in the same language as the book text.`
+    const systemPrompt = screenshotSystemPrompt(currentBook.title)
     ai.askWithImage(systemPrompt, `Please analyze this section of the page. ${regionDesc}`, imageDataUrl).then(result => {
       const assistantMsg: Message = { role: 'assistant', content: result, timestamp: Date.now() }
       setActiveConversation(prev => {
@@ -290,10 +294,8 @@ export default function App() {
       setActiveAnnotationId(ann.id)
       setSelectedText(ann.anchor.selectedText)
     }
-    // Jump to text position
     if (ann.anchor.selectedText) {
       setJumpToText(ann.anchor.selectedText)
-      setTimeout(() => setJumpToText(null), 100)
     }
   }, [])
 

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, HardDrive, BookOpen } from 'lucide-react'
 
-const PROXY_BASE = 'http://localhost:3001'
+import { PROXY_BASE } from '../config'
 
 interface LocalBook {
   path: string
