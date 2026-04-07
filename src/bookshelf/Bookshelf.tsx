@@ -53,7 +53,27 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
     const loadCovers = async () => {
       const entries = await Promise.all(
         books.map(async (book): Promise<[string, string] | null> => {
-          const coverData = await db.getCoverImage(book.id)
+          let coverData = await db.getCoverImage(book.id)
+
+          // Auto-extract cover for EPUB books that don't have one yet
+          if (!coverData && book.format === 'epub') {
+            try {
+              const fileData = await db.getFileData(book.id)
+              if (fileData) {
+                const ePubLib = await import('epubjs')
+                const epubBook = ePubLib.default(fileData.slice(0))
+                await epubBook.ready
+                const coverUrl = await epubBook.coverUrl()
+                if (coverUrl) {
+                  const resp = await fetch(coverUrl)
+                  coverData = await resp.arrayBuffer()
+                  await db.saveCoverImage(book.id, coverData)
+                }
+                epubBook.destroy()
+              }
+            } catch {}
+          }
+
           if (!coverData) return null
           const blob = new Blob([coverData])
           return [book.id, URL.createObjectURL(blob)]
