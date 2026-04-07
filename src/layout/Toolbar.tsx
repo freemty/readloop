@@ -1,10 +1,10 @@
-import { FileDown, Settings, BookOpen, Brain, HelpCircle, Lightbulb } from 'lucide-react'
+import { FileDown, Settings, BookOpen, Minus, AlignLeft, AlignJustify } from 'lucide-react'
 import type { AiMode } from '../ai/prompts'
 
-const AI_MODES: { value: AiMode; label: string; icon: typeof Brain }[] = [
-  { value: 'intellectual', label: 'Intellectual', icon: Brain },
-  { value: 'socratic', label: 'Socratic', icon: HelpCircle },
-  { value: 'eli5', label: 'ELI5', icon: Lightbulb },
+const AI_MODES: { value: AiMode; label: string; icon: typeof Minus }[] = [
+  { value: 'concise', label: 'Concise', icon: Minus },
+  { value: 'normal', label: 'Normal', icon: AlignLeft },
+  { value: 'verbose', label: 'Verbose', icon: AlignJustify },
 ]
 
 interface ToolbarProps {

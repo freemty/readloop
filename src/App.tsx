@@ -54,7 +54,11 @@ export default function App() {
   const [selectedText, setSelectedText] = useState('')
   const [selectionPage, setSelectionPage] = useState(0)
 
-  const [aiMode, setAiMode] = useState<AiMode>(() => (localStorage.getItem('readloop-ai-mode') as AiMode) || 'intellectual')
+  const [aiMode, setAiMode] = useState<AiMode>(() => {
+    const stored = localStorage.getItem('readloop-ai-mode')
+    if (stored === 'concise' || stored === 'normal' || stored === 'verbose') return stored
+    return 'normal'
+  })
   const handleAiModeChange = useCallback((mode: AiMode) => {
     setAiMode(mode)
     localStorage.setItem('readloop-ai-mode', mode)
