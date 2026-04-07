@@ -293,7 +293,7 @@ export function EpubViewer({
       {/* EPUB container */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-hidden"
+        className="flex-1 overflow-auto"
         style={{ background: 'var(--bg-warm)' }}
       />
     </div>
