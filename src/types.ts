@@ -17,6 +17,8 @@ export interface Book {
   lastReadAnchor?: PositionAnchor
   createdAt: number
   updatedAt: number
+  wikiSlug?: string
+  wikiReady?: boolean
 }
 
 export interface Message {
