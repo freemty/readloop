@@ -12,6 +12,7 @@ import type { Annotation } from '../types'
 interface EpubViewerProps {
   fileData: ArrayBuffer
   annotations?: Annotation[]
+  jumpToText?: string | null
   onTextSelect?: (text: string, anchor: { page: number; rects: DOMRect[] }) => void
   onPageChange?: (page: number) => void
   onParagraphsReady?: (paragraphs: { index: number; text: string }[], page: number) => void
@@ -72,6 +73,7 @@ function applyHighlightsToDoc(doc: Document, annotations: Annotation[]) {
 export function EpubViewer({
   fileData,
   annotations: externalAnnotations,
+  jumpToText,
   onTextSelect,
   onPageChange,
   onParagraphsReady,
@@ -264,6 +266,44 @@ export function EpubViewer({
       rendition.display(currentCfiRef.current)
     }
   }, [fontSizeIndex, applyTheme])
+
+  // Jump to text — search iframe text nodes and scroll into view
+  useEffect(() => {
+    if (!jumpToText) return
+    const rendition = renditionRef.current
+    if (!rendition) return
+
+    const tryJump = () => {
+      try {
+        const contents = rendition.getContents()
+        const contentsList = Array.isArray(contents) ? contents as Array<{ document: Document }> : []
+        for (const c of contentsList) {
+          if (!c?.document) continue
+          const walker = c.document.createTreeWalker(c.document.body, NodeFilter.SHOW_TEXT)
+          while (walker.nextNode()) {
+            const node = walker.currentNode as Text
+            const idx = node.textContent?.indexOf(jumpToText) ?? -1
+            if (idx === -1) continue
+            const range = c.document.createRange()
+            range.setStart(node, idx)
+            range.setEnd(node, idx + jumpToText.length)
+            const rect = range.getBoundingClientRect()
+            if (rect.height > 0) {
+              const el = node.parentElement
+              el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              return
+            }
+          }
+        }
+      } catch {
+        // contents may not be ready yet
+      }
+    }
+
+    // Small delay to ensure content is rendered
+    const timer = setTimeout(tryJump, 200)
+    return () => clearTimeout(timer)
+  }, [jumpToText])
 
   const handlePrev = useCallback(() => {
     renditionRef.current?.prev()
