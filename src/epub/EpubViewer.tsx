@@ -64,7 +64,9 @@ function applyHighlightsToDoc(doc: Document, annotations: Annotation[]) {
       mark.style.borderRadius = '2px'
       mark.style.padding = '0 1px'
 
-      range.surroundContents(mark)
+      const contents = range.extractContents()
+      mark.appendChild(contents)
+      range.insertNode(mark)
       break
     }
   }
