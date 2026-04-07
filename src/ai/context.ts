@@ -12,6 +12,7 @@ interface AskContextInput {
   userQuery: string
   nearbyAnnotations: Annotation[]
   mode?: AiMode
+  wikiContext?: string
 }
 
 interface GuideContextInput {
@@ -55,6 +56,10 @@ export function buildAskContext(input: AskContextInput): PromptPair {
     if (priorNotes) {
       userPrompt += `\n\n**Previous questions nearby:**\n${priorNotes}`
     }
+  }
+
+  if (input.wikiContext) {
+    userPrompt += input.wikiContext
   }
 
   return {
