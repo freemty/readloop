@@ -7,9 +7,19 @@ interface AiClientConfig {
   baseUrl?: string
 }
 
-interface ChatMessage {
+interface ImageBlock {
+  type: 'image'
+  source: { type: 'base64'; media_type: string; data: string }
+}
+
+interface TextBlock {
+  type: 'text'
+  text: string
+}
+
+export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
-  content: string
+  content: string | (TextBlock | ImageBlock)[]
 }
 
 export interface AiClient {

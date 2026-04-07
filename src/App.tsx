@@ -178,16 +178,8 @@ export default function App() {
     setSelectedText(regionDesc)
     setActiveConversation([userMsg])
 
-    ai.askAi({
-      bookTitle: currentBook.title,
-      bookAuthor: currentBook.author,
-      currentChapter: '',
-      paragraphs: currentParagraphs.map(p => p.text),
-      currentParagraphIndex,
-      selectedText: regionDesc,
-      userQuery: `Please analyze this section of the page.\n${regionDesc}`,
-      nearbyAnnotations: annotations,
-    }).then(result => {
+    const systemPrompt = `You are analyzing a screenshot from "${currentBook.title}". Describe what you see and answer the user's question. Be concise. Answer in the same language as the book text.`
+    ai.askWithImage(systemPrompt, `Please analyze this section of the page. ${regionDesc}`, imageDataUrl).then(result => {
       const assistantMsg: Message = { role: 'assistant', content: result, timestamp: Date.now() }
       setActiveConversation(prev => {
         const updated = prev ? [...prev, assistantMsg] : [assistantMsg]

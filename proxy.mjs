@@ -215,15 +215,36 @@ async function handleLocalBooks(req, res) {
   res.end(JSON.stringify(books))
 }
 
+const ALLOWED_SCAN_DIRS = [
+  '~/Downloads', '~/Documents', '~/Desktop', '~/Books', '~/Zotero',
+  '~/Library/Mobile Documents/com~apple~CloudDocs',
+].map(d => d.startsWith('~') ? path.join(os.homedir(), d.slice(1)) : d)
+
+const ALLOWED_EXTENSIONS = ['.epub', '.pdf']
+
 async function handleLocalFile(filePath, res) {
   if (!filePath) {
     res.writeHead(400).end('Missing path parameter')
     return
   }
 
+  // Security: validate path is within allowed directories and has allowed extension
+  const resolved = fs.realpathSync(filePath)
+  const ext = path.extname(resolved).toLowerCase()
+
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    res.writeHead(403).end('Only .epub and .pdf files are allowed')
+    return
+  }
+
+  const inAllowedDir = ALLOWED_SCAN_DIRS.some(dir => resolved.startsWith(dir + path.sep) || resolved.startsWith(dir))
+  if (!inAllowedDir) {
+    res.writeHead(403).end('File is outside allowed directories')
+    return
+  }
+
   try {
-    const stat = fs.statSync(filePath)
-    const ext = path.extname(filePath).toLowerCase()
+    const stat = fs.statSync(resolved)
     const mimeType = ext === '.epub' ? 'application/epub+zip' : 'application/pdf'
 
     res.writeHead(200, {
@@ -231,7 +252,7 @@ async function handleLocalFile(filePath, res) {
       'Content-Length': stat.size,
       'Access-Control-Allow-Origin': '*',
     })
-    fs.createReadStream(filePath).pipe(res)
+    fs.createReadStream(resolved).pipe(res)
   } catch (err) {
     res.writeHead(404).end(`File not found: ${err.message}`)
   }
