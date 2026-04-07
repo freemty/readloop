@@ -31,8 +31,12 @@ export default function App() {
   const [selectedText, setSelectedText] = useState('')
   const [selectionPage, setSelectionPage] = useState(0)
 
-  // AI mode
-  const [aiMode, setAiMode] = useState<AiMode>('intellectual')
+  // AI mode (persisted)
+  const [aiMode, setAiMode] = useState<AiMode>(() => (localStorage.getItem('readloop-ai-mode') as AiMode) || 'intellectual')
+  const handleAiModeChange = useCallback((mode: AiMode) => {
+    setAiMode(mode)
+    localStorage.setItem('readloop-ai-mode', mode)
+  }, [])
 
   // Guide mode
   const [guideEnabled, setGuideEnabled] = useState(false)
@@ -47,6 +51,9 @@ export default function App() {
   // Paragraph tracking (used by guide mode + ask current page)
   const [currentParagraphs, setCurrentParagraphs] = useState<{ index: number; text: string }[]>([])
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0)
+
+  // Annotation jump
+  const [jumpToText, setJumpToText] = useState<string | null>(null)
 
   // Hooks
   const bookId = currentBook?.id ?? ''
@@ -283,6 +290,11 @@ export default function App() {
       setActiveAnnotationId(ann.id)
       setSelectedText(ann.anchor.selectedText)
     }
+    // Jump to text position
+    if (ann.anchor.selectedText) {
+      setJumpToText(ann.anchor.selectedText)
+      setTimeout(() => setJumpToText(null), 100)
+    }
   }, [])
 
   const handleParagraphsReady = useCallback((paragraphs: { index: number; text: string }[], _page: number) => {
@@ -368,7 +380,7 @@ export default function App() {
             guideEnabled={guideEnabled}
             onToggleGuide={() => setGuideEnabled(prev => !prev)}
             aiMode={aiMode}
-            onAiModeChange={setAiMode}
+            onAiModeChange={handleAiModeChange}
             onExport={handleExport}
             onOpenSettings={() => setSettingsOpen(true)}
           />
@@ -384,6 +396,7 @@ export default function App() {
                 <EpubViewer
                   fileData={pdfData}
                   annotations={annotations}
+                  jumpToText={jumpToText}
                   onTextSelect={handleTextSelect}
                   onParagraphsReady={handleParagraphsReady}
                 />
