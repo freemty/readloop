@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Send, X, User, Sparkles, AlertCircle } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import type { Message } from '../types'
 
 interface ConversationProps {
@@ -87,7 +88,7 @@ export function Conversation({ messages, isLoading, streamingText, error, onSend
                 )}
               </div>
               <div
-                className="rounded-lg px-3 py-2 whitespace-pre-wrap"
+                className="rounded-lg px-3 py-2"
                 style={{
                   maxWidth: '85%',
                   fontSize: '0.85rem',
@@ -98,6 +99,7 @@ export function Conversation({ messages, isLoading, streamingText, error, onSend
                         background: 'var(--accent-light)',
                         color: 'var(--text-primary)',
                         borderRadius: 'var(--radius-lg)',
+                        whiteSpace: 'pre-wrap' as const,
                       }
                     : {
                         background: 'var(--bg-card)',
@@ -107,7 +109,11 @@ export function Conversation({ messages, isLoading, streamingText, error, onSend
                       }),
                 }}
               >
-                {msg.content}
+                {msg.role === 'user' ? msg.content : (
+                  <div className="prose prose-sm max-w-none" style={{ fontSize: 'inherit', lineHeight: 'inherit', fontFamily: 'inherit' }}>
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}
@@ -134,7 +140,7 @@ export function Conversation({ messages, isLoading, streamingText, error, onSend
                 <span style={{ fontFamily: 'var(--font-ui)' }}>AI</span>
               </div>
               <div
-                className="rounded-lg px-3 py-2 whitespace-pre-wrap"
+                className="rounded-lg px-3 py-2"
                 style={{
                   maxWidth: '85%',
                   fontSize: '0.85rem',
@@ -146,7 +152,9 @@ export function Conversation({ messages, isLoading, streamingText, error, onSend
                   borderRadius: 'var(--radius-lg)',
                 }}
               >
-                {streamingText}
+                <div className="prose prose-sm max-w-none" style={{ fontSize: 'inherit', lineHeight: 'inherit', fontFamily: 'inherit' }}>
+                  <ReactMarkdown>{streamingText}</ReactMarkdown>
+                </div>
                 <motion.span
                   animate={{ opacity: [1, 0.2, 1] }}
                   transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
