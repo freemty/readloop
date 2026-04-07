@@ -258,6 +258,129 @@ async function handleLocalFile(filePath, res) {
   }
 }
 
+// ========== Wiki File I/O ==========
+const WIKI_ROOT = path.join(os.homedir(), 'readloop', 'wikis')
+
+async function handleWikiInit(req, res) {
+  let body = ''
+  for await (const chunk of req) body += chunk
+
+  try {
+    const { slug, files } = JSON.parse(body)
+    const wikiDir = path.join(WIKI_ROOT, slug)
+    const dirs = new Set()
+
+    for (const file of files) {
+      const fullPath = path.join(wikiDir, file.path)
+      const resolved = path.resolve(fullPath)
+      if (!resolved.startsWith(path.resolve(wikiDir) + path.sep) && resolved !== path.resolve(wikiDir)) {
+        continue
+      }
+      const dir = path.dirname(fullPath)
+      if (!dirs.has(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+        dirs.add(dir)
+      }
+      fs.writeFileSync(fullPath, file.content, 'utf-8')
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+    res.end(JSON.stringify({ ok: true, path: wikiDir }))
+  } catch (err) {
+    console.error('Wiki init error:', err.message)
+    if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+    res.end(JSON.stringify({ error: err.message }))
+  }
+}
+
+async function handleWikiRead(url, res) {
+  const slug = url.searchParams.get('slug')
+  const filePath = url.searchParams.get('path')
+
+  if (!slug) {
+    res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+    res.end(JSON.stringify({ error: 'Missing slug parameter' }))
+    return
+  }
+
+  const wikiDir = path.join(WIKI_ROOT, slug)
+
+  try {
+    if (filePath) {
+      const fullPath = path.resolve(path.join(wikiDir, filePath))
+      if (!fullPath.startsWith(path.resolve(wikiDir))) {
+        res.writeHead(403, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        res.end(JSON.stringify({ error: 'Path traversal denied' }))
+        return
+      }
+      if (!fs.existsSync(fullPath)) {
+        res.writeHead(404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        res.end(JSON.stringify({ error: 'File not found' }))
+        return
+      }
+      const content = fs.readFileSync(fullPath, 'utf-8')
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+      res.end(JSON.stringify({ content }))
+    } else {
+      if (!fs.existsSync(wikiDir)) {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        res.end(JSON.stringify({ files: [] }))
+        return
+      }
+      const files = []
+      function walkWiki(dir, prefix) {
+        const entries = fs.readdirSync(dir, { withFileTypes: true })
+        for (const entry of entries) {
+          const rel = prefix ? `${prefix}/${entry.name}` : entry.name
+          if (entry.isDirectory()) {
+            walkWiki(path.join(dir, entry.name), rel)
+          } else if (entry.name.endsWith('.md')) {
+            files.push(rel)
+          }
+        }
+      }
+      walkWiki(wikiDir, '')
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+      res.end(JSON.stringify({ files }))
+    }
+  } catch (err) {
+    console.error('Wiki read error:', err.message)
+    if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+    res.end(JSON.stringify({ error: err.message }))
+  }
+}
+
+async function handleWikiUpdate(req, res) {
+  let body = ''
+  for await (const chunk of req) body += chunk
+
+  try {
+    const { slug, files } = JSON.parse(body)
+    const wikiDir = path.join(WIKI_ROOT, slug)
+
+    for (const file of files) {
+      const fullPath = path.resolve(path.join(wikiDir, file.path))
+      if (!fullPath.startsWith(path.resolve(wikiDir))) continue
+
+      const dir = path.dirname(fullPath)
+      fs.mkdirSync(dir, { recursive: true })
+
+      if (file.mode === 'append' && fs.existsSync(fullPath)) {
+        fs.appendFileSync(fullPath, '\n' + file.content, 'utf-8')
+      } else {
+        fs.writeFileSync(fullPath, file.content, 'utf-8')
+      }
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+    res.end(JSON.stringify({ ok: true }))
+  } catch (err) {
+    console.error('Wiki update error:', err.message)
+    if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+    res.end(JSON.stringify({ error: err.message }))
+  }
+}
+
 // ========== Server ==========
 const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') {
@@ -275,6 +398,20 @@ const server = http.createServer((req, res) => {
   // Bedrock Claude proxy
   if (url.pathname === '/api/bedrock/chat' && req.method === 'POST') {
     handleBedrockChat(req, res)
+    return
+  }
+
+  // Wiki endpoints
+  if (url.pathname === '/api/wiki/init' && req.method === 'POST') {
+    handleWikiInit(req, res)
+    return
+  }
+  if (url.pathname === '/api/wiki/read' && req.method === 'GET') {
+    handleWikiRead(url, res)
+    return
+  }
+  if (url.pathname === '/api/wiki/update' && req.method === 'POST') {
+    handleWikiUpdate(req, res)
     return
   }
 
@@ -308,6 +445,7 @@ server.listen(PORT, () => {
   console.log(`ReadLoop proxy running on http://localhost:${PORT}`)
   console.log(`  Z-Library: via ${PROXY_URL}`)
   console.log(`  Bedrock:   region=${process.env.AWS_REGION || 'ap-northeast-1'}`)
+  console.log('  Wiki:      ~/readloop/wikis/')
   console.log('Endpoints:')
   console.log('  POST /api/bedrock/chat  — Bedrock Claude streaming')
   console.log('  GET  /api/search        — Z-Library search')
