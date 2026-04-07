@@ -63,8 +63,8 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
     loadCovers()
   }, [db, books])
 
-  const addBook = useCallback(async (file: File) => {
-    if (!db) return
+  const importBook = useCallback(async (file: File): Promise<{ id: string; buffer: ArrayBuffer; isNew: boolean }> => {
+    if (!db) throw new Error('DB not ready')
     const buffer = await file.arrayBuffer()
     const fileHash = await hashFile(buffer)
 
@@ -72,8 +72,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
     if (existing) {
       fileCache.set(existing.id, buffer)
       await db.saveFileData(existing.id, buffer)
-      onOpenBook(existing.id, buffer)
-      return
+      return { id: existing.id, buffer, isNew: false }
     }
 
     const format = file.name.toLowerCase().endsWith('.epub') ? 'epub' as const : 'pdf' as const
@@ -110,56 +109,25 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
     }
 
     setBooks(prev => [...prev, book])
-    onOpenBook(book.id, buffer)
-  }, [db, books, fileCache, onOpenBook])
+    return { id: book.id, buffer, isNew: true }
+  }, [db, books, fileCache])
+
+  const addBook = useCallback(async (file: File) => {
+    try {
+      const { id, buffer } = await importBook(file)
+      onOpenBook(id, buffer)
+    } catch {
+      // db not ready
+    }
+  }, [importBook, onOpenBook])
 
   const addBookSilent = useCallback(async (file: File) => {
-    if (!db) return
-    const buffer = await file.arrayBuffer()
-    const fileHash = await hashFile(buffer)
-
-    const existing = books.find(b => b.fileHash === fileHash)
-    if (existing) {
-      fileCache.set(existing.id, buffer)
-      await db.saveFileData(existing.id, buffer)
-      return
+    try {
+      await importBook(file)
+    } catch {
+      // db not ready
     }
-
-    const format = file.name.toLowerCase().endsWith('.epub') ? 'epub' as const : 'pdf' as const
-    const book: Book = {
-      id: crypto.randomUUID(),
-      title: file.name.replace(/\.(pdf|epub)$/i, ''),
-      author: '',
-      format,
-      fileHash,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }
-    await db.addBook(book)
-    await db.saveFileData(book.id, buffer)
-    fileCache.set(book.id, buffer)
-
-    if (format === 'epub') {
-      try {
-        const ePubLib = await import('epubjs')
-        const epubBook = ePubLib.default(buffer.slice(0))
-        await epubBook.ready
-        const coverUrl = await epubBook.coverUrl()
-        if (coverUrl) {
-          const coverResp = await fetch(coverUrl)
-          const coverData = await coverResp.arrayBuffer()
-          await db.saveCoverImage(book.id, coverData)
-          const blob = new Blob([coverData])
-          setCovers(prev => new Map(prev).set(book.id, URL.createObjectURL(blob)))
-        }
-        epubBook.destroy()
-      } catch {
-        // cover extraction is best-effort
-      }
-    }
-
-    setBooks(prev => [...prev, book])
-  }, [db, books, fileCache])
+  }, [importBook])
 
   const deleteBook = useCallback(async (bookId: string) => {
     if (!db) return
