@@ -15,7 +15,7 @@ interface EpubViewerProps {
   jumpToText?: string | null
   onTextSelect?: (text: string, anchor: { page: number; rects: DOMRect[] }) => void
   onPageChange?: (page: number) => void
-  onParagraphsReady?: (paragraphs: { index: number; text: string }[], page: number) => void
+  onParagraphsReady?: (paragraphs: { index: number; text: string }[], page: number, chapter?: string) => void
 }
 
 const FONT_SIZES = [14, 16, 18, 20, 22, 24]
@@ -196,7 +196,8 @@ export function EpubViewer({
 
       const sectionHref = location.start.href
       const navItem = findNavItemByHref(toc, sectionHref)
-      setChapterTitle(navItem?.label ?? '')
+      const chapterLabel = navItem?.label ?? ''
+      setChapterTitle(chapterLabel)
 
       onPageChange?.(location.start.displayed.page)
 
@@ -206,12 +207,12 @@ export function EpubViewer({
         if (contents && typeof contents === 'object' && 'document' in (contents as Record<string, unknown>)) {
           const doc = (contents as { document: Document }).document
           const paragraphs = extractParagraphs(doc)
-          onParagraphsReady?.(paragraphs, location.start.displayed.page)
+          onParagraphsReady?.(paragraphs, location.start.displayed.page, chapterLabel)
         } else if (Array.isArray(contents)) {
           const firstContents = (contents as Array<{ document: Document }>)[0]
           if (firstContents?.document) {
             const paragraphs = extractParagraphs(firstContents.document)
-            onParagraphsReady?.(paragraphs, location.start.displayed.page)
+            onParagraphsReady?.(paragraphs, location.start.displayed.page, chapterLabel)
           }
         }
       } catch {

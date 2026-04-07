@@ -20,6 +20,7 @@ import { initWiki, type ChapterText } from './wiki/initWiki'
 import { updateWiki } from './wiki/updateWiki'
 import { readChapterConcepts } from './wiki/readWiki'
 import { buildWikiContextBlock } from './wiki/prompts'
+import { nodeSlug } from './wiki/slugify'
 
 export default function App() {
   const [view, setViewState] = useState<AppView>('bookshelf')
@@ -78,7 +79,8 @@ export default function App() {
   const [activeConversation, setActiveConversation] = useState<Message[] | null>(null)
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null)
 
-  // Paragraph tracking (used by guide mode + ask current page)
+  // Paragraph & chapter tracking (used by guide mode + ask current page + wiki)
+  const [currentChapter, setCurrentChapter] = useState('')
   const [currentParagraphs, setCurrentParagraphs] = useState<{ index: number; text: string }[]>([])
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0)
 
@@ -291,7 +293,8 @@ export default function App() {
     let wikiContext: string | undefined
     if (currentBook.wikiReady && currentBook.wikiSlug) {
       try {
-        const concepts = await readChapterConcepts(currentBook.wikiSlug, '')
+        const chapterSlug = currentChapter ? nodeSlug(currentChapter) : ''
+        const concepts = await readChapterConcepts(currentBook.wikiSlug, chapterSlug)
         wikiContext = buildWikiContextBlock(concepts)
       } catch {
         // Wiki read failed — continue without wiki context
@@ -327,7 +330,8 @@ export default function App() {
         }
 
         if (currentBook.wikiReady && currentBook.wikiSlug) {
-          updateWiki(currentBook, updated, '', '').catch(err =>
+          const chSlug = currentChapter ? nodeSlug(currentChapter) : ''
+          updateWiki(currentBook, updated, currentChapter, chSlug).catch(err =>
             console.error('Wiki update failed:', err)
           )
         }
@@ -337,7 +341,7 @@ export default function App() {
     } catch {
       // error is handled by useAi hook
     }
-  }, [currentBook, selectedText, annotations, activeAnnotationId, ai, updateAnnotation, aiMode])
+  }, [currentBook, selectedText, annotations, activeAnnotationId, ai, updateAnnotation, aiMode, currentChapter])
 
   const handleHighlight = useCallback((color: string) => {
     setSelectionMenuPos(null)
@@ -402,9 +406,10 @@ export default function App() {
     setActiveAnnotationId(null)
   }, [activeAnnotationId, deleteAnnotation])
 
-  const handleParagraphsReady = useCallback((paragraphs: { index: number; text: string }[], _page: number) => {
+  const handleParagraphsReady = useCallback((paragraphs: { index: number; text: string }[], _page: number, chapter?: string) => {
     setCurrentParagraphs(paragraphs)
     setCurrentParagraphIndex(0)
+    if (chapter !== undefined) setCurrentChapter(chapter)
   }, [])
 
   // Trigger guide when enabled and paragraphs change

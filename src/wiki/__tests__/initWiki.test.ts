@@ -49,8 +49,6 @@ describe('buildWikiFiles', () => {
         title: '前奏',
         slug: '01-前奏',
         result: {
-          chapterTitle: '前奏',
-          chapterSlug: '01-前奏',
           summary: 'Chapter summary',
           concepts: [{ title: '大国幻象', slug: '大国幻象', summary: 'Concept summary', related: [] }],
           entities: [{ name: '习近平', slug: '习近平', type: 'person', role: 'Leader' }],
@@ -70,7 +68,7 @@ describe('buildWikiFiles', () => {
       {
         title: 'Ch1', slug: '01-ch1',
         result: {
-          chapterTitle: 'Ch1', chapterSlug: '01-ch1', summary: 's1',
+          summary: 's1',
           concepts: [{ title: 'A', slug: 'a', summary: 's', related: [] }],
           entities: [],
         },
@@ -78,7 +76,7 @@ describe('buildWikiFiles', () => {
       {
         title: 'Ch2', slug: '02-ch2',
         result: {
-          chapterTitle: 'Ch2', chapterSlug: '02-ch2', summary: 's2',
+          summary: 's2',
           concepts: [{ title: 'A', slug: 'a', summary: 'updated', related: [] }],
           entities: [],
         },

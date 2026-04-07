@@ -7,8 +7,6 @@ export interface WikiMeta {
 }
 
 export interface InitChapterResult {
-  chapterTitle: string
-  chapterSlug: string
   summary: string
   concepts: ConceptInit[]
   entities: EntityInit[]

@@ -5,7 +5,7 @@ export function wikiInitSystemPrompt(): string {
 
 Output ONLY valid JSON with this exact structure:
 {
-  "chapter_summary": "2-3 sentence summary of the chapter",
+  "summary": "2-3 sentence summary of the chapter",
   "concepts": [
     {
       "title": "Concept Title",
