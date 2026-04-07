@@ -49,18 +49,39 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
 
   useEffect(() => {
     if (!db || books.length === 0) return
+    let cancelled = false
     const loadCovers = async () => {
-      const newCovers = new Map<string, string>()
-      for (const book of books) {
-        const coverData = await db.getCoverImage(book.id)
-        if (coverData) {
+      const entries = await Promise.all(
+        books.map(async (book): Promise<[string, string] | null> => {
+          const coverData = await db.getCoverImage(book.id)
+          if (!coverData) return null
           const blob = new Blob([coverData])
-          newCovers.set(book.id, URL.createObjectURL(blob))
+          return [book.id, URL.createObjectURL(blob)]
+        })
+      )
+      if (cancelled) {
+        // Revoke any URLs we just created since component unmounted
+        for (const entry of entries) {
+          if (entry) URL.revokeObjectURL(entry[1])
         }
+        return
       }
-      setCovers(newCovers)
+      const newCovers = new Map<string, string>()
+      for (const entry of entries) {
+        if (entry) newCovers.set(entry[0], entry[1])
+      }
+      setCovers(prev => {
+        // Revoke old URLs that are being replaced
+        for (const [, url] of prev) {
+          URL.revokeObjectURL(url)
+        }
+        return newCovers
+      })
     }
     loadCovers()
+    return () => {
+      cancelled = true
+    }
   }, [db, books])
 
   const importBook = useCallback(async (file: File): Promise<{ id: string; buffer: ArrayBuffer; isNew: boolean }> => {
