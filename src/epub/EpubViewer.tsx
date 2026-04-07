@@ -5,6 +5,7 @@ import ePub from 'epubjs'
 import type Book from 'epubjs/types/book'
 import type Rendition from 'epubjs/types/rendition'
 import type { NavItem } from 'epubjs/types/navigation'
+import { ghostButtonStyle } from '../ui/styles'
 
 interface EpubViewerProps {
   fileData: ArrayBuffer
@@ -164,16 +165,17 @@ export function EpubViewer({
     if (navItem) setChapterTitle(navItem.label)
   }, [toc, currentCfi])
 
-  // Font size change
+  const currentCfiRef = useRef(currentCfi)
+  currentCfiRef.current = currentCfi
+
   useEffect(() => {
     const rendition = renditionRef.current
     if (!rendition) return
     applyTheme(rendition, FONT_SIZES[fontSizeIndex])
-    // Force re-render by re-displaying current location
-    if (currentCfi) {
-      rendition.display(currentCfi)
+    if (currentCfiRef.current) {
+      rendition.display(currentCfiRef.current)
     }
-  }, [fontSizeIndex, applyTheme, currentCfi])
+  }, [fontSizeIndex, applyTheme])
 
   const handlePrev = useCallback(() => {
     renditionRef.current?.prev()
@@ -191,19 +193,6 @@ export function EpubViewer({
     setFontSizeIndex(prev => Math.min(FONT_SIZES.length - 1, prev + 1))
   }, [])
 
-  const ghostButtonStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '1.75rem',
-    height: '1.75rem',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    background: 'transparent',
-    color: 'var(--text-secondary)',
-    cursor: 'pointer',
-    transition: 'background 0.12s, color 0.12s',
-  }
 
   return (
     <div className="flex flex-col h-full">

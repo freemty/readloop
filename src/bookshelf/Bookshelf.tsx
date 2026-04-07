@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Plus, Settings, Library } from 'lucide-react'
 import { BookCard } from './BookCard'
 import { ZlibSearch } from './ZlibSearch'
-import { createStore, type ReadLoopDB } from '../db/store'
+import { getStore, type ReadLoopDB } from '../db/store'
 import type { Book } from '../types'
 
 interface BookshelfProps {
@@ -38,7 +38,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
   const fileCache = useRef(new Map<string, ArrayBuffer>()).current
 
   useEffect(() => {
-    createStore().then(store => {
+    getStore().then(store => {
       setDb(store)
       store.getAllBooks().then(setBooks)
     })

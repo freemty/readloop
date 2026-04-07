@@ -12,7 +12,7 @@ import { useAnnotations } from './hooks/useAnnotations'
 import { useAi } from './hooks/useAi'
 import { useGuideCache } from './hooks/useGuideCache'
 import { createAnchor } from './pdf/anchor'
-import { createStore } from './db/store'
+import { getStore } from './db/store'
 import type { AppView, Annotation, Book, Message } from './types'
 
 export default function App() {
@@ -46,7 +46,7 @@ export default function App() {
   const ai = useAi()
 
   const handleOpenBook = useCallback(async (id: string, fileData: ArrayBuffer) => {
-    const db = await createStore()
+    const db = await getStore()
     const book = await db.getBook(id)
     if (book) setCurrentBook(book)
     setPdfData(fileData)
@@ -278,7 +278,7 @@ export default function App() {
   }, [guideEnabled, currentParagraphIndex, currentBook, currentParagraphs, getCachedGuide, ai, addGuide, bookId])
 
   const handleExport = useCallback(async () => {
-    const db = await createStore()
+    const db = await getStore()
     const data = await db.exportAll()
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)

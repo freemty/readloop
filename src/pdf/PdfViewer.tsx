@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
+import { ghostButtonStyle } from '../ui/styles'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -119,19 +120,6 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
     return () => document.removeEventListener('mouseup', handleMouseUp)
   }, [currentPage, onTextSelect])
 
-  const ghostButtonStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '1.75rem',
-    height: '1.75rem',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    background: 'transparent',
-    color: 'var(--text-secondary)',
-    cursor: 'pointer',
-    transition: 'background 0.12s, color 0.12s',
-  }
 
   return (
     <div className="flex flex-col h-full">

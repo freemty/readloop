@@ -35,6 +35,13 @@ export interface ReadLoopDB {
   exportAll(): Promise<{ books: Book[]; annotations: Annotation[]; guideCache: GuideCache[] }>
 }
 
+let _singleton: Promise<ReadLoopDB> | null = null
+
+export function getStore(name = 'readloop'): Promise<ReadLoopDB> {
+  if (!_singleton) _singleton = createStore(name)
+  return _singleton
+}
+
 export async function createStore(name = 'readloop'): Promise<ReadLoopDB> {
   const db: IDBPDatabase<ReadLoopSchema> = await openDB<ReadLoopSchema>(name, 2, {
     upgrade(database, oldVersion) {

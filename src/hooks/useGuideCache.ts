@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { createStore, type ReadLoopDB } from '../db/store'
+import { getStore, type ReadLoopDB } from '../db/store'
 import type { GuideCache } from '../types'
 
 export function useGuideCache(bookId: string) {
@@ -7,7 +7,7 @@ export function useGuideCache(bookId: string) {
   const [db, setDb] = useState<ReadLoopDB | null>(null)
 
   useEffect(() => {
-    createStore().then(store => {
+    getStore().then(store => {
       setDb(store)
       store.getGuideCacheByBook(bookId).then(setCache)
     })
