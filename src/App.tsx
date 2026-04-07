@@ -13,6 +13,7 @@ import { useAi } from './hooks/useAi'
 import { useGuideCache } from './hooks/useGuideCache'
 import { createAnchor } from './pdf/anchor'
 import { getStore } from './db/store'
+import type { AiMode } from './ai/prompts'
 import type { AppView, Annotation, Book, Message } from './types'
 import type { ScreenshotBbox } from './pdf/ScreenshotTool'
 
@@ -29,6 +30,9 @@ export default function App() {
   const [selectionMenuPos, setSelectionMenuPos] = useState<{ x: number; y: number } | null>(null)
   const [selectedText, setSelectedText] = useState('')
   const [selectionPage, setSelectionPage] = useState(0)
+
+  // AI mode
+  const [aiMode, setAiMode] = useState<AiMode>('intellectual')
 
   // Guide mode
   const [guideEnabled, setGuideEnabled] = useState(false)
@@ -133,6 +137,7 @@ export default function App() {
       selectedText: pageText.slice(0, 500),
       userQuery: query,
       nearbyAnnotations: annotations,
+      mode: aiMode,
     }).then(result => {
       const assistantMsg: Message = { role: 'assistant', content: result, timestamp: Date.now() }
       setActiveConversation(prev => {
@@ -142,7 +147,7 @@ export default function App() {
         return updated
       })
     }).catch(() => {})
-  }, [currentBook, currentParagraphs, currentParagraphIndex, bookId, annotations, addAnnotation, ai, updateAnnotation])
+  }, [currentBook, currentParagraphs, currentParagraphIndex, bookId, annotations, addAnnotation, ai, updateAnnotation, aiMode])
 
   const handleScreenshot = useCallback((imageDataUrl: string, bbox: ScreenshotBbox) => {
     if (!currentBook) return
@@ -205,6 +210,7 @@ export default function App() {
         selectedText,
         userQuery: query,
         nearbyAnnotations: annotations,
+        mode: aiMode,
       })
 
       const assistantMsg: Message = { role: 'assistant', content: result, timestamp: Date.now() }
@@ -225,7 +231,7 @@ export default function App() {
     } catch {
       // error is handled by useAi hook
     }
-  }, [currentBook, selectedText, annotations, activeAnnotationId, ai, updateAnnotation])
+  }, [currentBook, selectedText, annotations, activeAnnotationId, ai, updateAnnotation, aiMode])
 
   const handleHighlight = useCallback((color: string) => {
     setSelectionMenuPos(null)
@@ -361,6 +367,8 @@ export default function App() {
           <Toolbar
             guideEnabled={guideEnabled}
             onToggleGuide={() => setGuideEnabled(prev => !prev)}
+            aiMode={aiMode}
+            onAiModeChange={setAiMode}
             onExport={handleExport}
             onOpenSettings={() => setSettingsOpen(true)}
           />

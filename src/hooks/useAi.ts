@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { createAiClient, type ChatMessage } from '../ai/client'
 import { buildAskContext, buildGuideContext } from '../ai/context'
 import { loadSettings } from '../settings/SettingsModal'
+import type { AiMode } from '../ai/prompts'
 import type { Annotation } from '../types'
 
 interface UseAiReturn {
@@ -23,6 +24,7 @@ interface AskParams {
   selectedText: string
   userQuery: string
   nearbyAnnotations: Annotation[]
+  mode?: AiMode
 }
 
 interface GuideParams {

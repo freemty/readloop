@@ -1,4 +1,5 @@
 import { askSystemPrompt, guideSystemPrompt } from './prompts'
+import type { AiMode } from './prompts'
 import type { Annotation } from '../types'
 
 interface AskContextInput {
@@ -10,6 +11,7 @@ interface AskContextInput {
   selectedText: string
   userQuery: string
   nearbyAnnotations: Annotation[]
+  mode?: AiMode
 }
 
 interface GuideContextInput {
@@ -36,6 +38,7 @@ export function buildAskContext(input: AskContextInput): PromptPair {
     selectedText,
     userQuery,
     nearbyAnnotations,
+    mode,
   } = input
 
   const start = Math.max(0, currentParagraphIndex - 2)
@@ -55,7 +58,7 @@ export function buildAskContext(input: AskContextInput): PromptPair {
   }
 
   return {
-    systemPrompt: askSystemPrompt(bookTitle, bookAuthor),
+    systemPrompt: askSystemPrompt(bookTitle, bookAuthor, mode),
     userPrompt,
   }
 }
