@@ -39,6 +39,10 @@ export default function App() {
   const [activeConversation, setActiveConversation] = useState<Message[] | null>(null)
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null)
 
+  // Paragraph tracking (used by guide mode + ask current page)
+  const [currentParagraphs, setCurrentParagraphs] = useState<{ index: number; text: string }[]>([])
+  const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0)
+
   // Hooks
   const bookId = currentBook?.id ?? ''
   const { annotations, addAnnotation, updateAnnotation } = useAnnotations(bookId)
@@ -228,10 +232,6 @@ export default function App() {
       setSelectedText(ann.anchor.selectedText)
     }
   }, [])
-
-  // Guide mode: paragraph tracking
-  const [currentParagraphs, setCurrentParagraphs] = useState<{ index: number; text: string }[]>([])
-  const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0)
 
   const handleParagraphsReady = useCallback((paragraphs: { index: number; text: string }[], _page: number) => {
     setCurrentParagraphs(paragraphs)
