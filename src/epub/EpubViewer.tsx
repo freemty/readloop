@@ -7,8 +7,11 @@ import type Rendition from 'epubjs/types/rendition'
 import type { NavItem } from 'epubjs/types/navigation'
 import { ghostButtonStyle } from '../ui/styles'
 
+import type { Annotation } from '../types'
+
 interface EpubViewerProps {
   fileData: ArrayBuffer
+  annotations?: Annotation[]
   onTextSelect?: (text: string, anchor: { page: number; rects: DOMRect[] }) => void
   onPageChange?: (page: number) => void
   onParagraphsReady?: (paragraphs: { index: number; text: string }[], page: number) => void
@@ -33,8 +36,41 @@ function extractParagraphs(doc: Document): { index: number; text: string }[] {
   return paragraphs
 }
 
+function applyHighlightsToDoc(doc: Document, annotations: Annotation[]) {
+  const highlights = annotations.filter(a => a.type === 'highlight' && a.anchor.selectedText)
+  if (highlights.length === 0) return
+
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+  const textNodes: Text[] = []
+  while (walker.nextNode()) textNodes.push(walker.currentNode as Text)
+
+  for (const ann of highlights) {
+    const searchText = ann.anchor.selectedText
+    const color = ann.color || '#ffeb3b'
+
+    for (const node of textNodes) {
+      const idx = node.textContent?.indexOf(searchText) ?? -1
+      if (idx === -1) continue
+
+      const range = doc.createRange()
+      range.setStart(node, idx)
+      range.setEnd(node, idx + searchText.length)
+
+      const mark = doc.createElement('mark')
+      mark.style.backgroundColor = color
+      mark.style.opacity = '0.4'
+      mark.style.borderRadius = '2px'
+      mark.style.padding = '0 1px'
+
+      range.surroundContents(mark)
+      break
+    }
+  }
+}
+
 export function EpubViewer({
   fileData,
+  annotations: externalAnnotations,
   onTextSelect,
   onPageChange,
   onParagraphsReady,
@@ -96,10 +132,15 @@ export function EpubViewer({
       setToc(nav.toc)
     })
 
-    // Selection handler — use rendition.hooks to inject mouseup listener into each iframe
+    // Content hook — inject mouseup listener and render highlights in each iframe
     rendition.hooks.content.register((contents: { window: Window; document: Document }) => {
       const iframeDoc = contents.document
       const iframeWin = contents.window
+
+      // Render highlights from annotations
+      if (externalAnnotations) {
+        applyHighlightsToDoc(iframeDoc, externalAnnotations)
+      }
 
       iframeDoc.addEventListener('mouseup', () => {
         setTimeout(() => {

@@ -329,6 +329,7 @@ export default function App() {
               {pdfData && currentBook?.format === 'epub' ? (
                 <EpubViewer
                   fileData={pdfData}
+                  annotations={annotations}
                   onTextSelect={handleTextSelect}
                   onParagraphsReady={handleParagraphsReady}
                 />

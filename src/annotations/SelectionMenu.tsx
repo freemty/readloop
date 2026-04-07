@@ -45,6 +45,7 @@ export function SelectionMenu({ position, onAskAi, onHighlight, onNote, onDismis
             left: position.x,
             top: position.y - 52,
             background: '#2C2C2C',
+            color: '#ffffff',
             backdropFilter: 'blur(8px)',
             boxShadow: 'var(--shadow-3)',
           }}
