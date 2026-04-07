@@ -18,10 +18,33 @@ import type { AppView, Annotation, Book, Message } from './types'
 import type { ScreenshotBbox } from './pdf/ScreenshotTool'
 
 export default function App() {
-  // Navigation
-  const [view, setView] = useState<AppView>('bookshelf')
+  const [view, setViewState] = useState<AppView>('bookshelf')
   const [currentBook, setCurrentBook] = useState<Book | null>(null)
   const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null)
+
+  // Sync view with browser history
+  const setView = useCallback((v: AppView) => {
+    setViewState(v)
+    if (v === 'reader') {
+      history.pushState({ view: 'reader' }, '', '#reader')
+    } else {
+      history.replaceState({ view: 'bookshelf' }, '', '#')
+    }
+  }, [])
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash
+      if (hash === '#reader' && view === 'reader') {
+        // User pressed back while in reader → go to bookshelf
+        setViewState('bookshelf')
+        setCurrentBook(null)
+        setPdfData(null)
+      }
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [view])
 
   // Settings
   const [settingsOpen, setSettingsOpen] = useState(false)
