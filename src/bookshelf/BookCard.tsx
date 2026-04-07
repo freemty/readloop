@@ -4,6 +4,7 @@ import type { Book } from '../types'
 
 interface BookCardProps {
   book: Book
+  coverUrl?: string
   onOpen: (bookId: string) => void
   onDelete: (bookId: string) => void
 }
@@ -22,7 +23,7 @@ function getCoverGradient(id: string): string {
   return gradients[index]
 }
 
-export function BookCard({ book, onOpen, onDelete }: BookCardProps) {
+export function BookCard({ book, coverUrl, onOpen, onDelete }: BookCardProps) {
   return (
     <motion.div
       whileHover={{ translateY: -2, boxShadow: 'var(--shadow-3)' }}
@@ -38,19 +39,32 @@ export function BookCard({ book, onOpen, onDelete }: BookCardProps) {
       onClick={() => onOpen(book.id)}
     >
       {/* Book cover */}
-      <div
-        className="w-full flex items-center justify-center"
-        style={{
-          height: '9rem',
-          background: getCoverGradient(book.id),
-        }}
-      >
-        <BookOpen
-          size={36}
-          style={{ color: 'rgba(255,255,255,0.85)' }}
-          strokeWidth={1.5}
+      {coverUrl ? (
+        <img
+          src={coverUrl}
+          alt={book.title}
+          style={{
+            width: '100%',
+            height: '9rem',
+            objectFit: 'cover',
+            display: 'block',
+          }}
         />
-      </div>
+      ) : (
+        <div
+          className="w-full flex items-center justify-center"
+          style={{
+            height: '9rem',
+            background: getCoverGradient(book.id),
+          }}
+        >
+          <BookOpen
+            size={36}
+            style={{ color: 'rgba(255,255,255,0.85)' }}
+            strokeWidth={1.5}
+          />
+        </div>
+      )}
 
       {/* Book info */}
       <div className="p-3">

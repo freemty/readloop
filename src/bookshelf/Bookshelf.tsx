@@ -37,6 +37,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [localOpen, setLocalOpen] = useState(false)
+  const [covers, setCovers] = useState<Map<string, string>>(new Map())
   const fileCache = useRef(new Map<string, ArrayBuffer>()).current
 
   useEffect(() => {
@@ -45,6 +46,22 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
       store.getAllBooks().then(setBooks)
     })
   }, [])
+
+  useEffect(() => {
+    if (!db || books.length === 0) return
+    const loadCovers = async () => {
+      const newCovers = new Map<string, string>()
+      for (const book of books) {
+        const coverData = await db.getCoverImage(book.id)
+        if (coverData) {
+          const blob = new Blob([coverData])
+          newCovers.set(book.id, URL.createObjectURL(blob))
+        }
+      }
+      setCovers(newCovers)
+    }
+    loadCovers()
+  }, [db, books])
 
   const addBook = useCallback(async (file: File) => {
     if (!db) return
@@ -72,6 +89,26 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
     await db.addBook(book)
     await db.saveFileData(book.id, buffer)
     fileCache.set(book.id, buffer)
+
+    if (format === 'epub') {
+      try {
+        const ePubLib = await import('epubjs')
+        const epubBook = ePubLib.default(buffer.slice(0))
+        await epubBook.ready
+        const coverUrl = await epubBook.coverUrl()
+        if (coverUrl) {
+          const coverResp = await fetch(coverUrl)
+          const coverData = await coverResp.arrayBuffer()
+          await db.saveCoverImage(book.id, coverData)
+          const blob = new Blob([coverData])
+          setCovers(prev => new Map(prev).set(book.id, URL.createObjectURL(blob)))
+        }
+        epubBook.destroy()
+      } catch {
+        // cover extraction is best-effort
+      }
+    }
+
     setBooks(prev => [...prev, book])
     onOpenBook(book.id, buffer)
   }, [db, books, fileCache, onOpenBook])
@@ -101,6 +138,26 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
     await db.addBook(book)
     await db.saveFileData(book.id, buffer)
     fileCache.set(book.id, buffer)
+
+    if (format === 'epub') {
+      try {
+        const ePubLib = await import('epubjs')
+        const epubBook = ePubLib.default(buffer.slice(0))
+        await epubBook.ready
+        const coverUrl = await epubBook.coverUrl()
+        if (coverUrl) {
+          const coverResp = await fetch(coverUrl)
+          const coverData = await coverResp.arrayBuffer()
+          await db.saveCoverImage(book.id, coverData)
+          const blob = new Blob([coverData])
+          setCovers(prev => new Map(prev).set(book.id, URL.createObjectURL(blob)))
+        }
+        epubBook.destroy()
+      } catch {
+        // cover extraction is best-effort
+      }
+    }
+
     setBooks(prev => [...prev, book])
   }, [db, books, fileCache])
 
@@ -288,6 +345,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
               <motion.div key={book.id} variants={itemVariants}>
                 <BookCard
                   book={book}
+                  coverUrl={covers.get(book.id)}
                   onOpen={openExistingBook}
                   onDelete={deleteBook}
                 />

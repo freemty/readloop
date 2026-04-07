@@ -6,11 +6,17 @@ interface FileData {
   data: ArrayBuffer
 }
 
+interface CoverData {
+  bookId: string
+  data: ArrayBuffer
+}
+
 interface ReadLoopSchema {
   books: { key: string; value: Book }
   annotations: { key: string; value: Annotation; indexes: { byBook: string } }
   guideCache: { key: string; value: GuideCache; indexes: { byBook: string } }
   fileData: { key: string; value: FileData }
+  coverImages: { key: string; value: CoverData }
 }
 
 export interface ReadLoopDB {
@@ -32,6 +38,9 @@ export interface ReadLoopDB {
   getFileData(bookId: string): Promise<ArrayBuffer | undefined>
   deleteFileData(bookId: string): Promise<void>
 
+  saveCoverImage(bookId: string, data: ArrayBuffer): Promise<void>
+  getCoverImage(bookId: string): Promise<ArrayBuffer | undefined>
+
   exportAll(): Promise<{ books: Book[]; annotations: Annotation[]; guideCache: GuideCache[] }>
 }
 
@@ -43,7 +52,7 @@ export function getStore(name = 'readloop'): Promise<ReadLoopDB> {
 }
 
 export async function createStore(name = 'readloop'): Promise<ReadLoopDB> {
-  const db: IDBPDatabase<ReadLoopSchema> = await openDB<ReadLoopSchema>(name, 2, {
+  const db: IDBPDatabase<ReadLoopSchema> = await openDB<ReadLoopSchema>(name, 3, {
     upgrade(database, oldVersion) {
       if (oldVersion < 1) {
         database.createObjectStore('books', { keyPath: 'id' })
@@ -54,6 +63,9 @@ export async function createStore(name = 'readloop'): Promise<ReadLoopDB> {
       }
       if (oldVersion < 2) {
         database.createObjectStore('fileData', { keyPath: 'bookId' })
+      }
+      if (oldVersion < 3) {
+        database.createObjectStore('coverImages', { keyPath: 'bookId' })
       }
     },
   })
@@ -104,6 +116,14 @@ export async function createStore(name = 'readloop'): Promise<ReadLoopDB> {
     },
     async deleteFileData(bookId) {
       await db.delete('fileData', bookId)
+    },
+
+    async saveCoverImage(bookId, data) {
+      await db.put('coverImages', { bookId, data })
+    },
+    async getCoverImage(bookId) {
+      const entry = await db.get('coverImages', bookId)
+      return entry?.data
     },
 
     async exportAll() {
