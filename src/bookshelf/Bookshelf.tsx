@@ -76,6 +76,34 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
     onOpenBook(book.id, buffer)
   }, [db, books, fileCache, onOpenBook])
 
+  const addBookSilent = useCallback(async (file: File) => {
+    if (!db) return
+    const buffer = await file.arrayBuffer()
+    const fileHash = await hashFile(buffer)
+
+    const existing = books.find(b => b.fileHash === fileHash)
+    if (existing) {
+      fileCache.set(existing.id, buffer)
+      await db.saveFileData(existing.id, buffer)
+      return
+    }
+
+    const format = file.name.toLowerCase().endsWith('.epub') ? 'epub' as const : 'pdf' as const
+    const book: Book = {
+      id: crypto.randomUUID(),
+      title: file.name.replace(/\.(pdf|epub)$/i, ''),
+      author: '',
+      format,
+      fileHash,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    await db.addBook(book)
+    await db.saveFileData(book.id, buffer)
+    fileCache.set(book.id, buffer)
+    setBooks(prev => [...prev, book])
+  }, [db, books, fileCache])
+
   const deleteBook = useCallback(async (bookId: string) => {
     if (!db) return
     await db.deleteBook(bookId)
@@ -283,7 +311,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
       <AnimatePresence>
         {localOpen && (
           <LocalBooks
-            onImport={(file) => { setLocalOpen(false); addBook(file) }}
+            onImport={(file) => { addBookSilent(file) }}
             onClose={() => setLocalOpen(false)}
           />
         )}

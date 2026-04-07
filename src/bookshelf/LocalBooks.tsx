@@ -27,6 +27,7 @@ export function LocalBooks({ onImport, onClose }: LocalBooksProps) {
   const [loading, setLoading] = useState(false)
   const [scanned, setScanned] = useState(false)
   const [importing, setImporting] = useState<string | null>(null)
+  const [imported, setImported] = useState<Set<string>>(new Set())
 
   const handleScan = useCallback(async () => {
     setLoading(true)
@@ -51,6 +52,7 @@ export function LocalBooks({ onImport, onClose }: LocalBooksProps) {
         type: book.format === 'epub' ? 'application/epub+zip' : 'application/pdf',
       })
       onImport(file)
+      setImported(prev => new Set([...prev, book.path]))
     } catch {
       // silently fail
     } finally {
@@ -151,12 +153,12 @@ export function LocalBooks({ onImport, onClose }: LocalBooksProps) {
                         </div>
                         <motion.button
                           onClick={() => handleImport(book)}
-                          disabled={importing === book.path}
+                          disabled={importing === book.path || imported.has(book.path)}
                           whileTap={{ scale: 0.95 }}
                           className="px-3 py-1 rounded text-xs font-medium"
-                          style={{ background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', opacity: importing === book.path ? 0.5 : 1 }}
+                          style={{ background: imported.has(book.path) ? 'var(--border)' : 'var(--accent)', color: imported.has(book.path) ? 'var(--text-secondary)' : '#fff', border: 'none', cursor: imported.has(book.path) ? 'default' : 'pointer' }}
                         >
-                          {importing === book.path ? '...' : 'Import'}
+                          {imported.has(book.path) ? '✓' : importing === book.path ? '...' : 'Import'}
                         </motion.button>
                       </motion.div>
                     ))}
