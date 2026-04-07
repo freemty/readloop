@@ -96,34 +96,43 @@ export function EpubViewer({
       setToc(nav.toc)
     })
 
-    // Selection handler
-    rendition.on('selected', (cfiRange: string, contents: { window: Window; document: Document }) => {
-      const selection = contents.window.getSelection()
-      const text = selection?.toString().trim() ?? ''
-      if (!text || !onTextSelect) return
+    // Selection handler — use rendition.hooks to inject mouseup listener into each iframe
+    rendition.hooks.content.register((contents: { window: Window; document: Document }) => {
+      const iframeDoc = contents.document
+      const iframeWin = contents.window
 
-      const pseudoPage = Math.abs(
-        cfiRange.split('').reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0), 0)
-      ) % 100000
+      iframeDoc.addEventListener('mouseup', () => {
+        setTimeout(() => {
+          const selection = iframeWin.getSelection()
+          const text = selection?.toString().trim() ?? ''
+          if (!text || !onTextSelect) return
 
-      // Get rects and offset from iframe to main page coordinates
-      const rects: DOMRect[] = []
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0)
-        const clientRects = Array.from(range.getClientRects())
+          const rects: DOMRect[] = []
+          if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0)
+            const clientRects = Array.from(range.getClientRects())
 
-        // Find the iframe element to get its offset in the main page
-        const iframe = containerRef.current?.querySelector('iframe')
-        const iframeRect = iframe?.getBoundingClientRect()
-        const offsetX = iframeRect?.left ?? 0
-        const offsetY = iframeRect?.top ?? 0
+            // Find which iframe this content belongs to
+            const iframes = containerRef.current?.querySelectorAll('iframe') ?? []
+            let offsetX = 0
+            let offsetY = 0
+            for (const iframe of iframes) {
+              if ((iframe as HTMLIFrameElement).contentWindow === iframeWin) {
+                const rect = iframe.getBoundingClientRect()
+                offsetX = rect.left
+                offsetY = rect.top
+                break
+              }
+            }
 
-        for (const r of clientRects) {
-          rects.push(new DOMRect(r.x + offsetX, r.y + offsetY, r.width, r.height))
-        }
-      }
+            for (const r of clientRects) {
+              rects.push(new DOMRect(r.x + offsetX, r.y + offsetY, r.width, r.height))
+            }
+          }
 
-      onTextSelect(text, { page: pseudoPage, rects })
+          onTextSelect(text, { page: 0, rects })
+        }, 10)
+      })
     })
 
     // Relocation handler
