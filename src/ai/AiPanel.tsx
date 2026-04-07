@@ -18,6 +18,7 @@ interface AiPanelProps {
   conversationError: string | null
   onSendMessage: (query: string) => void
   onCloseConversation: () => void
+  onDeleteConversation?: () => void
   onAskCurrentPage?: (query: string) => void
 }
 
@@ -33,6 +34,7 @@ export function AiPanel({
   conversationError,
   onSendMessage,
   onCloseConversation,
+  onDeleteConversation,
   onAskCurrentPage,
 }: AiPanelProps) {
   const [quickInput, setQuickInput] = useState('')
@@ -115,6 +117,7 @@ export function AiPanel({
                     error={conversationError}
                     onSend={onSendMessage}
                     onClose={onCloseConversation}
+                    onDelete={onDeleteConversation}
                   />
                 </div>
               )}

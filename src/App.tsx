@@ -89,7 +89,7 @@ export default function App() {
 
   // Hooks
   const bookId = currentBook?.id ?? ''
-  const { annotations, addAnnotation, updateAnnotation } = useAnnotations(bookId)
+  const { annotations, addAnnotation, updateAnnotation, deleteAnnotation } = useAnnotations(bookId)
   const { getCachedGuide, addGuide } = useGuideCache(bookId)
   const ai = useAi()
 
@@ -326,6 +326,14 @@ export default function App() {
     }
   }, [])
 
+  const handleDeleteConversation = useCallback(() => {
+    if (activeAnnotationId) {
+      deleteAnnotation(activeAnnotationId)
+    }
+    setActiveConversation(null)
+    setActiveAnnotationId(null)
+  }, [activeAnnotationId, deleteAnnotation])
+
   const handleParagraphsReady = useCallback((paragraphs: { index: number; text: string }[], _page: number) => {
     setCurrentParagraphs(paragraphs)
     setCurrentParagraphIndex(0)
@@ -464,6 +472,7 @@ export default function App() {
                 conversationError={ai.error}
                 onSendMessage={handleSendMessage}
                 onCloseConversation={() => { setActiveConversation(null); setActiveAnnotationId(null) }}
+                onDeleteConversation={handleDeleteConversation}
                 onAskCurrentPage={handleAskCurrentPage}
               />
             </div>

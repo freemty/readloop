@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Send, X, User, Sparkles, AlertCircle } from 'lucide-react'
+import { Send, X, Trash2, User, Sparkles, AlertCircle } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import type { Message } from '../types'
 
@@ -11,9 +11,10 @@ interface ConversationProps {
   error: string | null
   onSend: (query: string) => void
   onClose: () => void
+  onDelete?: () => void
 }
 
-export function Conversation({ messages, isLoading, streamingText, error, onSend, onClose }: ConversationProps) {
+export function Conversation({ messages, isLoading, streamingText, error, onSend, onClose, onDelete }: ConversationProps) {
   const [input, setInput] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -42,22 +43,43 @@ export function Conversation({ messages, isLoading, streamingText, error, onSend
             Conversation
           </h3>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={onClose}
-          className="flex items-center justify-center rounded"
-          style={{
-            color: 'var(--text-muted)',
-            width: '1.5rem',
-            height: '1.5rem',
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-        >
-          <X size={13} strokeWidth={2} />
-        </motion.button>
+        <div className="flex items-center gap-1">
+          {onDelete && (
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onDelete}
+              className="flex items-center justify-center rounded"
+              style={{
+                color: 'var(--text-muted)',
+                width: '1.5rem',
+                height: '1.5rem',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              title="Delete conversation"
+            >
+              <Trash2 size={13} strokeWidth={2} />
+            </motion.button>
+          )}
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onClose}
+            className="flex items-center justify-center rounded"
+            style={{
+              color: 'var(--text-muted)',
+              width: '1.5rem',
+              height: '1.5rem',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <X size={13} strokeWidth={2} />
+          </motion.button>
+        </div>
       </div>
 
       {/* Messages */}
