@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Plus, Settings, Library } from 'lucide-react'
+import { Search, Plus, Settings, Library, HardDrive } from 'lucide-react'
 import { BookCard } from './BookCard'
 import { ZlibSearch } from './ZlibSearch'
+import { LocalBooks } from './LocalBooks'
 import { getStore, type ReadLoopDB } from '../db/store'
 import type { Book } from '../types'
 
@@ -35,6 +36,7 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
   const [db, setDb] = useState<ReadLoopDB | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [localOpen, setLocalOpen] = useState(false)
   const fileCache = useRef(new Map<string, ArrayBuffer>()).current
 
   useEffect(() => {
@@ -159,6 +161,18 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
             Search Z-Library
           </motion.button>
 
+          {/* Local Books */}
+          <motion.button
+            onClick={() => setLocalOpen(true)}
+            whileHover={{ background: 'var(--bg-paper)' }}
+            whileTap={{ scale: 0.96 }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm"
+            style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)' }}
+          >
+            <HardDrive size={14} strokeWidth={2} />
+            Local
+          </motion.button>
+
           {/* Add PDF */}
           <label
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer"
@@ -261,6 +275,16 @@ export function Bookshelf({ onOpenBook, onOpenSettings }: BookshelfProps) {
           <ZlibSearch
             onDownloaded={(file) => { setSearchOpen(false); addBook(file) }}
             onClose={() => setSearchOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Local Books Modal */}
+      <AnimatePresence>
+        {localOpen && (
+          <LocalBooks
+            onImport={(file) => { setLocalOpen(false); addBook(file) }}
+            onClose={() => setLocalOpen(false)}
           />
         )}
       </AnimatePresence>

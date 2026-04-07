@@ -150,6 +150,93 @@ async function handleZlibProxy(targetPath, res) {
   }
 }
 
+// ========== Local Book Scanner ==========
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
+
+function scanForBooks(dirs, extensions = ['.epub', '.pdf']) {
+  const results = []
+  const visited = new Set()
+
+  function walk(dir, depth = 0) {
+    if (depth > 4 || visited.has(dir)) return
+    visited.add(dir)
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true })
+      for (const entry of entries) {
+        if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
+        const fullPath = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          walk(fullPath, depth + 1)
+        } else if (entry.isFile()) {
+          const ext = path.extname(entry.name).toLowerCase()
+          if (extensions.includes(ext)) {
+            try {
+              const stat = fs.statSync(fullPath)
+              results.push({
+                path: fullPath,
+                name: path.basename(entry.name, ext),
+                format: ext.slice(1),
+                size: stat.size,
+                modified: stat.mtimeMs,
+              })
+            } catch {}
+          }
+        }
+      }
+    } catch {}
+  }
+
+  for (const dir of dirs) {
+    const resolved = dir.replace('~', os.homedir())
+    if (fs.existsSync(resolved)) walk(resolved)
+  }
+
+  return results.sort((a, b) => b.modified - a.modified)
+}
+
+async function handleLocalBooks(req, res) {
+  const scanDirs = [
+    '~/Downloads',
+    '~/Documents',
+    '~/Desktop',
+    '~/Books',
+    '~/Zotero',
+    '~/Library/Mobile Documents/com~apple~CloudDocs',
+  ]
+
+  const books = scanForBooks(scanDirs)
+
+  res.writeHead(200, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  })
+  res.end(JSON.stringify(books))
+}
+
+async function handleLocalFile(filePath, res) {
+  if (!filePath) {
+    res.writeHead(400).end('Missing path parameter')
+    return
+  }
+
+  try {
+    const stat = fs.statSync(filePath)
+    const ext = path.extname(filePath).toLowerCase()
+    const mimeType = ext === '.epub' ? 'application/epub+zip' : 'application/pdf'
+
+    res.writeHead(200, {
+      'Content-Type': mimeType,
+      'Content-Length': stat.size,
+      'Access-Control-Allow-Origin': '*',
+    })
+    fs.createReadStream(filePath).pipe(res)
+  } catch (err) {
+    res.writeHead(404).end(`File not found: ${err.message}`)
+  }
+}
+
 // ========== Server ==========
 const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') {
@@ -167,6 +254,18 @@ const server = http.createServer((req, res) => {
   // Bedrock Claude proxy
   if (url.pathname === '/api/bedrock/chat' && req.method === 'POST') {
     handleBedrockChat(req, res)
+    return
+  }
+
+  // Local file scan
+  if (url.pathname === '/api/local-books') {
+    handleLocalBooks(req, res)
+    return
+  }
+
+  // Serve a local file by path
+  if (url.pathname === '/api/local-file') {
+    handleLocalFile(url.searchParams.get('path'), res)
     return
   }
 
