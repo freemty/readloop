@@ -16,6 +16,10 @@ import { getStore } from './db/store'
 import { screenshotSystemPrompt, type AiMode } from './ai/prompts'
 import type { AppView, Annotation, Book, Message } from './types'
 import type { ScreenshotBbox } from './pdf/ScreenshotTool'
+import { initWiki, type ChapterText } from './wiki/initWiki'
+import { updateWiki } from './wiki/updateWiki'
+import { readChapterConcepts } from './wiki/readWiki'
+import { buildWikiContextBlock } from './wiki/prompts'
 
 export default function App() {
   const [view, setViewState] = useState<AppView>('bookshelf')
@@ -96,10 +100,56 @@ export default function App() {
   const handleOpenBook = useCallback(async (id: string, fileData: ArrayBuffer) => {
     const db = await getStore()
     const book = await db.getBook(id)
-    if (book) setCurrentBook(book)
+    if (book) {
+      setCurrentBook(book)
+      if (!book.wikiReady) {
+        extractChaptersFromBook(book, fileData).then(chapters => {
+          if (chapters.length > 0) {
+            initWiki(book, chapters).then(slug => {
+              setCurrentBook(prev => prev ? { ...prev, wikiSlug: slug, wikiReady: true } : prev)
+            }).catch(err => console.error('Wiki init failed:', err))
+          }
+        })
+      }
+    }
     setPdfData(fileData)
     setView('reader')
   }, [])
+
+  async function extractChaptersFromBook(book: Book, fileData: ArrayBuffer): Promise<ChapterText[]> {
+    if (book.format !== 'epub') return []
+    try {
+      const ePubLib = await import('epubjs')
+      const epubBook = ePubLib.default(fileData)
+      await epubBook.ready
+      const nav = await epubBook.loaded.navigation
+      const spine = epubBook.spine as unknown as { items: Array<{ href: string; load: (resolver: unknown) => Promise<{ document: Document }> }> }
+      const chapters: ChapterText[] = []
+      let chapterIndex = 0
+      for (const item of spine.items) {
+        try {
+          const section = await item.load(epubBook.load.bind(epubBook))
+          const text = section.document.body?.textContent?.trim() ?? ''
+          if (text.length < 50) continue
+          const navItem = nav.toc.find(t => {
+            const tocBase = t.href.split('#')[0]
+            return item.href.endsWith(tocBase) || tocBase.endsWith(item.href)
+          })
+          const title = navItem?.label?.trim() ?? `Section ${chapterIndex + 1}`
+          const slug = `${String(chapterIndex + 1).padStart(2, '0')}-${title.replace(/[\/\\:]/g, '-').slice(0, 50)}`
+          chapters.push({ title, slug, text: text.slice(0, 8000) })
+          chapterIndex++
+        } catch {
+          // Skip sections that fail to load
+        }
+      }
+      epubBook.destroy()
+      return chapters
+    } catch (err) {
+      console.error('Chapter extraction failed:', err)
+      return []
+    }
+  }
 
   const handleTextSelect = useCallback((text: string, anchor: { page: number; rects: DOMRect[] }) => {
     if (!text.trim()) return
@@ -238,6 +288,16 @@ export default function App() {
     const userMsg: Message = { role: 'user', content: query, timestamp: Date.now() }
     setActiveConversation(prev => prev ? [...prev, userMsg] : [userMsg])
 
+    let wikiContext: string | undefined
+    if (currentBook.wikiReady && currentBook.wikiSlug) {
+      try {
+        const concepts = await readChapterConcepts(currentBook.wikiSlug, '')
+        wikiContext = buildWikiContextBlock(concepts)
+      } catch {
+        // Wiki read failed — continue without wiki context
+      }
+    }
+
     try {
       const result = await ai.askAi({
         bookTitle: currentBook.title,
@@ -249,6 +309,7 @@ export default function App() {
         userQuery: query,
         nearbyAnnotations: annotations,
         mode: aiMode,
+        wikiContext,
       })
 
       const assistantMsg: Message = { role: 'assistant', content: result, timestamp: Date.now() }
@@ -264,6 +325,13 @@ export default function App() {
             })
           }
         }
+
+        if (currentBook.wikiReady && currentBook.wikiSlug) {
+          updateWiki(currentBook, updated, '', '').catch(err =>
+            console.error('Wiki update failed:', err)
+          )
+        }
+
         return updated
       })
     } catch {
