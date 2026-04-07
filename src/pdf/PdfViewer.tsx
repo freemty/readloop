@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { ZoomIn, ZoomOut } from 'lucide-react'
+import { ZoomIn, ZoomOut, Camera } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { ghostButtonStyle } from '../ui/styles'
+import { ScreenshotTool } from './ScreenshotTool'
+import type { ScreenshotBbox } from './ScreenshotTool'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -13,14 +15,16 @@ interface PdfViewerProps {
   onTextSelect?: (text: string, anchor: { page: number; rects: DOMRect[] }) => void
   onPageChange?: (page: number) => void
   onParagraphsReady?: (paragraphs: { index: number; text: string }[], page: number) => void
+  onScreenshot?: (imageDataUrl: string, bbox: ScreenshotBbox) => void
 }
 
-export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsReady }: PdfViewerProps) {
+export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsReady, onScreenshot }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
   const [scale, setScale] = useState(1.5)
+  const [screenshotActive, setScreenshotActive] = useState(false)
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
   const textLayerRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 
@@ -144,6 +148,22 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
 
         <div className="flex items-center gap-1" style={{ marginLeft: 'auto' }}>
           <button
+            onClick={() => setScreenshotActive(prev => !prev)}
+            style={{
+              ...ghostButtonStyle,
+              ...(screenshotActive
+                ? {
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    borderColor: 'var(--accent)',
+                  }
+                : {}),
+            }}
+            title={screenshotActive ? 'Cancel screenshot (Esc)' : 'Screenshot region for AI'}
+          >
+            <Camera size={13} strokeWidth={2} />
+          </button>
+          <button
             onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
             style={ghostButtonStyle}
             title="Zoom out"
@@ -174,7 +194,7 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
       {/* PDF container */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto"
+        className="flex-1 overflow-auto relative"
         style={{ background: 'var(--bg-paper)' }}
       >
         <div className="flex flex-col items-center gap-4 py-6">
@@ -195,6 +215,16 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
             </div>
           ))}
         </div>
+        <ScreenshotTool
+          active={screenshotActive}
+          canvasRefs={canvasRefs}
+          currentPage={currentPage}
+          onCapture={(dataUrl, bbox) => {
+            setScreenshotActive(false)
+            onScreenshot?.(dataUrl, bbox)
+          }}
+          onCancel={() => setScreenshotActive(false)}
+        />
       </div>
     </div>
   )

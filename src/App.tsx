@@ -14,6 +14,7 @@ import { useGuideCache } from './hooks/useGuideCache'
 import { createAnchor } from './pdf/anchor'
 import { getStore } from './db/store'
 import type { AppView, Annotation, Book, Message } from './types'
+import type { ScreenshotBbox } from './pdf/ScreenshotTool'
 
 export default function App() {
   // Navigation
@@ -142,6 +143,59 @@ export default function App() {
       })
     }).catch(() => {})
   }, [currentBook, currentParagraphs, currentParagraphIndex, bookId, annotations, addAnnotation, ai, updateAnnotation])
+
+  const handleScreenshot = useCallback((imageDataUrl: string, bbox: ScreenshotBbox) => {
+    if (!currentBook) return
+
+    const regionDesc = `[Screenshot from page ${bbox.page}, region: ${bbox.x},${bbox.y},${bbox.width}×${bbox.height}]`
+    const userMsg: Message = {
+      role: 'user',
+      content: `Please analyze this section of the page.\n${regionDesc}`,
+      timestamp: Date.now(),
+    }
+
+    const annotation: Annotation = {
+      id: crypto.randomUUID(),
+      bookId,
+      anchor: {
+        chapter: '',
+        paragraph: 0,
+        textPrefix: '',
+        selectedText: regionDesc,
+        textSuffix: '',
+        pageHint: bbox.page,
+        bbox: { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height },
+      },
+      type: 'conversation',
+      noteText: imageDataUrl,
+      conversation: [userMsg],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+
+    addAnnotation(annotation)
+    setActiveAnnotationId(annotation.id)
+    setSelectedText(regionDesc)
+    setActiveConversation([userMsg])
+
+    ai.askAi({
+      bookTitle: currentBook.title,
+      bookAuthor: currentBook.author,
+      currentChapter: '',
+      paragraphs: currentParagraphs.map(p => p.text),
+      currentParagraphIndex,
+      selectedText: regionDesc,
+      userQuery: `Please analyze this section of the page.\n${regionDesc}`,
+      nearbyAnnotations: annotations,
+    }).then(result => {
+      const assistantMsg: Message = { role: 'assistant', content: result, timestamp: Date.now() }
+      setActiveConversation(prev => {
+        const updated = prev ? [...prev, assistantMsg] : [assistantMsg]
+        updateAnnotation({ ...annotation, conversation: updated, updatedAt: Date.now() })
+        return updated
+      })
+    }).catch(() => {})
+  }, [currentBook, bookId, currentParagraphs, currentParagraphIndex, annotations, addAnnotation, ai, updateAnnotation])
 
   const handleSendMessage = useCallback(async (query: string) => {
     if (!currentBook) return
@@ -338,6 +392,7 @@ export default function App() {
                   fileData={pdfData}
                   onTextSelect={handleTextSelect}
                   onParagraphsReady={handleParagraphsReady}
+                  onScreenshot={handleScreenshot}
                 />
               ) : null}
               <SelectionMenu

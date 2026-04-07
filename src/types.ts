@@ -5,6 +5,7 @@ export interface PositionAnchor {
   selectedText: string
   textSuffix: string
   pageHint?: number
+  bbox?: { x: number; y: number; width: number; height: number }
 }
 
 export interface Book {
