@@ -38,16 +38,17 @@ function extractParagraphs(doc: Document): { index: number; text: string }[] {
 }
 
 function applyHighlightsToDoc(doc: Document, annotations: Annotation[]) {
-  const highlights = annotations.filter(a => a.type === 'highlight' && a.anchor.selectedText)
-  if (highlights.length === 0) return
+  const relevant = annotations.filter(
+    a => (a.type === 'highlight' || a.type === 'conversation' || a.type === 'note') && a.anchor.selectedText
+  )
+  if (relevant.length === 0) return
 
   const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
   const textNodes: Text[] = []
   while (walker.nextNode()) textNodes.push(walker.currentNode as Text)
 
-  for (const ann of highlights) {
+  for (const ann of relevant) {
     const searchText = ann.anchor.selectedText
-    const color = ann.color || '#ffeb3b'
 
     for (const node of textNodes) {
       const idx = node.textContent?.indexOf(searchText) ?? -1
@@ -59,10 +60,22 @@ function applyHighlightsToDoc(doc: Document, annotations: Annotation[]) {
 
       const mark = doc.createElement('mark')
       mark.setAttribute('data-readloop', '1')
-      mark.style.backgroundColor = color
-      mark.style.opacity = '0.4'
-      mark.style.borderRadius = '2px'
-      mark.style.padding = '0 1px'
+
+      if (ann.type === 'highlight') {
+        const color = ann.color || '#ffeb3b'
+        mark.style.backgroundColor = color
+        mark.style.opacity = '0.4'
+        mark.style.borderRadius = '2px'
+        mark.style.padding = '0 1px'
+      } else if (ann.type === 'conversation') {
+        mark.style.backgroundColor = 'transparent'
+        mark.style.borderBottom = '2px dotted #C06030'
+        mark.style.padding = '0'
+      } else if (ann.type === 'note') {
+        mark.style.backgroundColor = 'transparent'
+        mark.style.borderBottom = '2px dotted #8C8578'
+        mark.style.padding = '0'
+      }
 
       const contents = range.extractContents()
       mark.appendChild(contents)
