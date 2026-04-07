@@ -57,6 +57,7 @@ function applyHighlightsToDoc(doc: Document, annotations: Annotation[]) {
       range.setEnd(node, idx + searchText.length)
 
       const mark = doc.createElement('mark')
+      mark.setAttribute('data-readloop', '1')
       mark.style.backgroundColor = color
       mark.style.opacity = '0.4'
       mark.style.borderRadius = '2px'
@@ -213,6 +214,34 @@ export function EpubViewer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileData])
+
+  // Re-apply highlights when annotations change
+  useEffect(() => {
+    const rendition = renditionRef.current
+    if (!rendition || !externalAnnotations) return
+
+    try {
+      const contents = rendition.getContents()
+      if (Array.isArray(contents)) {
+        for (const c of contents as Array<{ document: Document }>) {
+          if (c?.document) {
+            // Remove existing marks first
+            const marks = c.document.querySelectorAll('mark[data-readloop]')
+            marks.forEach(m => {
+              const parent = m.parentNode
+              if (parent) {
+                parent.replaceChild(c.document.createTextNode(m.textContent || ''), m)
+                parent.normalize()
+              }
+            })
+            applyHighlightsToDoc(c.document, externalAnnotations)
+          }
+        }
+      }
+    } catch {
+      // contents may not be ready
+    }
+  }, [externalAnnotations])
 
   // Update chapter title when toc changes (for initial load)
   useEffect(() => {
