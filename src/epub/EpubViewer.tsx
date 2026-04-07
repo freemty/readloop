@@ -79,10 +79,11 @@ export function EpubViewer({
     bookRef.current = book
 
     const rendition = book.renderTo(containerRef.current, {
-      flow: 'scrolled-doc',
+      flow: 'scrolled',
       width: '100%',
       height: '100%',
-    })
+      manager: 'continuous',
+    } as any)
     renditionRef.current = rendition
 
     applyTheme(rendition, FONT_SIZES[fontSizeIndex])

@@ -89,6 +89,56 @@ export default function App() {
     setActiveAnnotationId(annotation.id)
   }, [bookId, selectedText, selectionPage, addAnnotation])
 
+  const handleAskCurrentPage = useCallback((query: string) => {
+    if (!currentBook) return
+    // Create a new conversation using current page paragraphs as context
+    const pageText = currentParagraphs.map(p => p.text).join('\n')
+    setSelectedText(pageText.slice(0, 500))
+    setActiveConversation([])
+    setActiveAnnotationId(null)
+
+    const annotation: Annotation = {
+      id: crypto.randomUUID(),
+      bookId,
+      anchor: createAnchor({
+        chapter: '',
+        paragraph: currentParagraphIndex,
+        fullText: pageText,
+        selectedText: pageText.slice(0, 200),
+        selectionStart: 0,
+      }),
+      type: 'conversation',
+      conversation: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    addAnnotation(annotation)
+    setActiveAnnotationId(annotation.id)
+
+    // Immediately send the query
+    const userMsg: Message = { role: 'user', content: query, timestamp: Date.now() }
+    setActiveConversation([userMsg])
+
+    ai.askAi({
+      bookTitle: currentBook.title,
+      bookAuthor: currentBook.author,
+      currentChapter: '',
+      paragraphs: currentParagraphs.map(p => p.text),
+      currentParagraphIndex,
+      selectedText: pageText.slice(0, 500),
+      userQuery: query,
+      nearbyAnnotations: annotations,
+    }).then(result => {
+      const assistantMsg: Message = { role: 'assistant', content: result, timestamp: Date.now() }
+      setActiveConversation(prev => {
+        const updated = prev ? [...prev, assistantMsg] : [assistantMsg]
+        const ann = annotations.find(a => a.id === annotation.id) ?? annotation
+        updateAnnotation({ ...ann, conversation: updated, updatedAt: Date.now() })
+        return updated
+      })
+    }).catch(() => {})
+  }, [currentBook, currentParagraphs, currentParagraphIndex, bookId, annotations, addAnnotation, ai, updateAnnotation])
+
   const handleSendMessage = useCallback(async (query: string) => {
     if (!currentBook) return
 
@@ -316,6 +366,7 @@ export default function App() {
                 conversationError={ai.error}
                 onSendMessage={handleSendMessage}
                 onCloseConversation={() => { setActiveConversation(null); setActiveAnnotationId(null) }}
+                onAskCurrentPage={handleAskCurrentPage}
               />
             </div>
           </div>
