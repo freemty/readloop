@@ -97,21 +97,30 @@ export function EpubViewer({
     })
 
     // Selection handler
-    rendition.on('selected', (cfiRange: string, contents: { window: Window }) => {
+    rendition.on('selected', (cfiRange: string, contents: { window: Window; document: Document }) => {
       const selection = contents.window.getSelection()
       const text = selection?.toString().trim() ?? ''
       if (!text || !onTextSelect) return
 
-      // Use a hash of the cfiRange as a pseudo page number
       const pseudoPage = Math.abs(
         cfiRange.split('').reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0), 0)
       ) % 100000
 
+      // Get rects and offset from iframe to main page coordinates
       const rects: DOMRect[] = []
       if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0)
         const clientRects = Array.from(range.getClientRects())
-        rects.push(...clientRects)
+
+        // Find the iframe element to get its offset in the main page
+        const iframe = containerRef.current?.querySelector('iframe')
+        const iframeRect = iframe?.getBoundingClientRect()
+        const offsetX = iframeRect?.left ?? 0
+        const offsetY = iframeRect?.top ?? 0
+
+        for (const r of clientRects) {
+          rects.push(new DOMRect(r.x + offsetX, r.y + offsetY, r.width, r.height))
+        }
       }
 
       onTextSelect(text, { page: pseudoPage, rects })
