@@ -522,12 +522,15 @@ export default function App() {
                   annotations={annotations}
                   jumpToText={jumpToText}
                   onTextSelect={handleTextSelect}
+                  onAnnotationClick={handleAnnotationSelect}
                   onParagraphsReady={handleParagraphsReady}
                 />
               ) : pdfData ? (
                 <PdfViewer
                   fileData={pdfData}
+                  annotations={annotations}
                   onTextSelect={handleTextSelect}
+                  onAnnotationClick={handleAnnotationSelect}
                   onParagraphsReady={handleParagraphsReady}
                   onScreenshot={handleScreenshot}
                 />

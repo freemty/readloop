@@ -14,6 +14,7 @@ interface EpubViewerProps {
   annotations?: Annotation[]
   jumpToText?: string | null
   onTextSelect?: (text: string, anchor: { page: number; rects: DOMRect[] }) => void
+  onAnnotationClick?: (annotation: Annotation) => void
   onPageChange?: (page: number) => void
   onParagraphsReady?: (paragraphs: { index: number; text: string }[], page: number, chapter?: string) => void
 }
@@ -60,6 +61,7 @@ function applyHighlightsToDoc(doc: Document, annotations: Annotation[]) {
 
       const mark = doc.createElement('mark')
       mark.setAttribute('data-readloop', '1')
+      mark.setAttribute('data-annotation-id', ann.id)
 
       if (ann.type === 'highlight') {
         const color = ann.color || '#ffeb3b'
@@ -71,14 +73,26 @@ function applyHighlightsToDoc(doc: Document, annotations: Annotation[]) {
         mark.style.backgroundColor = 'transparent'
         mark.style.borderBottom = '2px dotted #C06030'
         mark.style.padding = '0'
+        mark.style.cursor = 'pointer'
       } else if (ann.type === 'note') {
         mark.style.backgroundColor = 'transparent'
         mark.style.borderBottom = '2px dotted #8C8578'
         mark.style.padding = '0'
+        mark.style.cursor = 'pointer'
       }
 
       const contents = range.extractContents()
       mark.appendChild(contents)
+
+      // Add a small chat icon badge for conversation annotations
+      if (ann.type === 'conversation') {
+        const badge = doc.createElement('span')
+        badge.setAttribute('data-readloop-badge', '1')
+        badge.textContent = '💬'
+        badge.style.cssText = 'font-size:10px;margin-left:2px;vertical-align:super;cursor:pointer;user-select:none;'
+        mark.appendChild(badge)
+      }
+
       range.insertNode(mark)
       break
     }
@@ -90,12 +104,17 @@ export function EpubViewer({
   annotations: externalAnnotations,
   jumpToText,
   onTextSelect,
+  onAnnotationClick,
   onPageChange,
   onParagraphsReady,
 }: EpubViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bookRef = useRef<Book | null>(null)
   const renditionRef = useRef<Rendition | null>(null)
+  const annotationsRef = useRef(externalAnnotations)
+  annotationsRef.current = externalAnnotations
+  const onAnnotationClickRef = useRef(onAnnotationClick)
+  onAnnotationClickRef.current = onAnnotationClick
 
   const [chapterTitle, setChapterTitle] = useState('')
   const [toc, setToc] = useState<NavItem[]>([])
@@ -150,11 +169,25 @@ export function EpubViewer({
       setToc(nav.toc)
     })
 
-    // Content hook — inject mouseup listener into each iframe
+    // Content hook — inject mouseup + click listeners into each iframe
     // (highlights are applied by the separate externalAnnotations effect)
     rendition.hooks.content.register((contents: { window: Window; document: Document }) => {
       const iframeDoc = contents.document
       const iframeWin = contents.window
+
+      // Click on annotation marks → open conversation
+      iframeDoc.addEventListener('click', (e: MouseEvent) => {
+        const target = e.target as HTMLElement
+        const mark = target.closest('mark[data-annotation-id]') as HTMLElement | null
+        if (!mark) return
+        const annId = mark.getAttribute('data-annotation-id')
+        if (!annId || !onAnnotationClickRef.current || !annotationsRef.current) return
+        const ann = annotationsRef.current.find(a => a.id === annId)
+        if (ann && (ann.type === 'conversation' || ann.type === 'note')) {
+          e.stopPropagation()
+          onAnnotationClickRef.current(ann)
+        }
+      })
 
       iframeDoc.addEventListener('mouseup', () => {
         setTimeout(() => {

@@ -4,6 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 import { ghostButtonStyle } from '../ui/styles'
 import { ScreenshotTool } from './ScreenshotTool'
 import type { ScreenshotBbox } from './ScreenshotTool'
+import type { Annotation } from '../types'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -12,13 +13,15 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 
 interface PdfViewerProps {
   fileData: ArrayBuffer
+  annotations?: Annotation[]
   onTextSelect?: (text: string, anchor: { page: number; rects: DOMRect[] }) => void
+  onAnnotationClick?: (annotation: Annotation) => void
   onPageChange?: (page: number) => void
   onParagraphsReady?: (paragraphs: { index: number; text: string }[], page: number) => void
   onScreenshot?: (imageDataUrl: string, bbox: ScreenshotBbox) => void
 }
 
-export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsReady, onScreenshot }: PdfViewerProps) {
+export function PdfViewer({ fileData, annotations, onTextSelect, onAnnotationClick, onPageChange, onParagraphsReady, onScreenshot }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -27,6 +30,10 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
   const [screenshotActive, setScreenshotActive] = useState(false)
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
   const textLayerRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const annotationsRef = useRef(annotations)
+  annotationsRef.current = annotations
+  const onAnnotationClickRef = useRef(onAnnotationClick)
+  onAnnotationClickRef.current = onAnnotationClick
 
   useEffect(() => {
     const loadPdf = async () => {
@@ -36,6 +43,93 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
     }
     loadPdf()
   }, [fileData])
+
+  // Empty deps: accesses latest values via refs only
+  const applyAnnotationHighlights = useCallback((pageNum: number) => {
+    const textLayerDiv = textLayerRefs.current.get(pageNum)
+    const anns = annotationsRef.current
+    if (!textLayerDiv || !anns) return
+
+    // Remove existing highlights
+    textLayerDiv.querySelectorAll('[data-readloop-highlight]').forEach(el => el.remove())
+
+    const pageAnns = anns.filter(
+      a => (a.type === 'conversation' || a.type === 'note')
+        && a.anchor.selectedText
+        && (a.anchor.pageHint === pageNum || a.anchor.pageHint == null)
+    )
+    if (pageAnns.length === 0) return
+
+    const parentRect = textLayerDiv.getBoundingClientRect()
+
+    const makeClickHandler = (annId: string) => (e: MouseEvent) => {
+      e.stopPropagation()
+      const cb = onAnnotationClickRef.current
+      const latestAnns = annotationsRef.current
+      if (!cb || !latestAnns) return
+      const latest = latestAnns.find(a => a.id === annId)
+      if (latest) cb(latest)
+    }
+
+    // Search text spans in the text layer for matching text
+    const spans = textLayerDiv.querySelectorAll('span')
+    for (const ann of pageAnns) {
+      const searchText = ann.anchor.selectedText
+      let fullText = ''
+      const spanTexts: { span: HTMLSpanElement; start: number; end: number }[] = []
+      for (const span of spans) {
+        const text = span.textContent ?? ''
+        const start = fullText.length
+        fullText += text
+        spanTexts.push({ span, start, end: fullText.length })
+      }
+
+      const matchIdx = fullText.indexOf(searchText)
+      if (matchIdx === -1) continue
+
+      const matchEnd = matchIdx + searchText.length
+      for (const { span, start, end } of spanTexts) {
+        if (end <= matchIdx || start >= matchEnd) continue
+
+        const spanRect = span.getBoundingClientRect()
+        const overlay = document.createElement('div')
+        overlay.setAttribute('data-readloop-highlight', '1')
+        overlay.setAttribute('data-annotation-id', ann.id)
+        overlay.style.cssText = `
+          position:absolute;
+          left:${spanRect.left - parentRect.left}px;
+          top:${spanRect.top - parentRect.top}px;
+          width:${spanRect.width}px;
+          height:${spanRect.height}px;
+          border-bottom:2px dotted ${ann.type === 'conversation' ? '#C06030' : '#8C8578'};
+          pointer-events:auto;
+          cursor:pointer;
+          z-index:5;
+        `
+        overlay.addEventListener('click', makeClickHandler(ann.id))
+        textLayerDiv.appendChild(overlay)
+
+        // Add chat badge on the last overlapping span
+        if (ann.type === 'conversation' && end >= matchEnd) {
+          const badge = document.createElement('div')
+          badge.setAttribute('data-readloop-highlight', '1')
+          badge.textContent = '\uD83D\uDCAC'
+          badge.style.cssText = `
+            position:absolute;
+            left:${spanRect.right - parentRect.left + 2}px;
+            top:${spanRect.top - parentRect.top - 2}px;
+            font-size:10px;
+            pointer-events:auto;
+            cursor:pointer;
+            z-index:6;
+            user-select:none;
+          `
+          badge.addEventListener('click', makeClickHandler(ann.id))
+          textLayerDiv.appendChild(badge)
+        }
+      }
+    }
+  }, [])
 
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdf) return
@@ -64,6 +158,8 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
       })
       await textLayer.render()
 
+      applyAnnotationHighlights(pageNum)
+
       if (onParagraphsReady) {
         const textContent = await page.getTextContent()
         const textItems = textContent.items as Array<{ str: string; transform: number[]; height: number }>
@@ -76,7 +172,7 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
         onParagraphsReady(paragraphs, pageNum)
       }
     }
-  }, [pdf, scale, onParagraphsReady])
+  }, [pdf, scale, onParagraphsReady, applyAnnotationHighlights])
 
   useEffect(() => {
     if (!pdf) return
@@ -85,6 +181,20 @@ export function PdfViewer({ fileData, onTextSelect, onPageChange, onParagraphsRe
     )
     pagesToRender.forEach(renderPage)
   }, [pdf, currentPage, scale, totalPages, renderPage])
+
+  // Re-apply annotation highlights when annotations change (only on already-rendered pages)
+  useEffect(() => {
+    if (!annotations || !pdf) return
+    const pagesToHighlight = [currentPage - 1, currentPage, currentPage + 1].filter(
+      p => p >= 1 && p <= totalPages
+    )
+    for (const p of pagesToHighlight) {
+      const textLayerDiv = textLayerRefs.current.get(p)
+      if (textLayerDiv && textLayerDiv.children.length > 0) {
+        applyAnnotationHighlights(p)
+      }
+    }
+  }, [annotations, currentPage, totalPages, pdf, applyAnnotationHighlights])
 
   useEffect(() => {
     const handleScroll = () => {
