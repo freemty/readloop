@@ -20,7 +20,11 @@ if (!epubPath || !fs.existsSync(epubPath)) {
 // --- Config ---
 const PROXY_URL = process.env.https_proxy || process.env.http_proxy || 'http://127.0.0.1:7890'
 const agent = new HttpsProxyAgent(PROXY_URL)
-const MODEL = process.env.AWS_BEDROCK_MODEL || 'arn:aws:bedrock:ap-northeast-1:996669628573:application-inference-profile/ancz2q6iic7m'
+const MODEL = process.env.AWS_BEDROCK_MODEL
+if (!MODEL) {
+  console.error('Error: AWS_BEDROCK_MODEL not set. Add it to .env or pass as env var.')
+  process.exit(1)
+}
 const WIKI_ROOT = path.join(os.homedir(), 'readloop', 'wikis')
 
 const bedrock = new BedrockRuntimeClient({
@@ -41,7 +45,9 @@ async function extractChapters(filePath) {
   const zip = await JSZip.loadAsync(data)
 
   // Parse container.xml to find content.opf
-  const containerXml = await zip.file('META-INF/container.xml').async('string')
+  const containerFile = zip.file('META-INF/container.xml')
+  if (!containerFile) throw new Error('Invalid EPUB: missing META-INF/container.xml')
+  const containerXml = await containerFile.async('string')
   const containerDom = new JSDOM(containerXml, { contentType: 'text/xml' })
   const rootfilePath = containerDom.window.document
     .querySelector('rootfile')?.getAttribute('full-path')
@@ -50,7 +56,9 @@ async function extractChapters(filePath) {
   const opfDir = rootfilePath.includes('/') ? rootfilePath.replace(/\/[^/]+$/, '/') : ''
 
   // Parse content.opf for spine + manifest
-  const opfXml = await zip.file(rootfilePath).async('string')
+  const opfFile = zip.file(rootfilePath)
+  if (!opfFile) throw new Error(`Invalid EPUB: missing ${rootfilePath}`)
+  const opfXml = await opfFile.async('string')
   const opfDom = new JSDOM(opfXml, { contentType: 'text/xml' })
   const opfDoc = opfDom.window.document
 
@@ -102,7 +110,7 @@ async function extractChapters(filePath) {
     // Find TOC label
     const bareHref = href.split('/').pop()
     const title = tocMap.get(href) ?? tocMap.get(bareHref) ?? `Section ${idx + 1}`
-    const slug = `${String(idx + 1).padStart(2, '0')}-${title.replace(/[\/\\:]/g, '-').slice(0, 50)}`
+    const slug = `${String(idx + 1).padStart(2, '0')}-${slugify(title).slice(0, 50)}`
 
     chapters.push({ title, slug, text: text.slice(0, 8000) })
     idx++
@@ -126,10 +134,11 @@ async function chat(system, user) {
   })
 
   const response = await bedrock.send(command)
+  const decoder = new TextDecoder()
   let full = ''
   for await (const event of response.body) {
     if (event.chunk) {
-      const decoded = JSON.parse(new TextDecoder().decode(event.chunk.bytes))
+      const decoded = JSON.parse(decoder.decode(event.chunk.bytes))
       if (decoded.type === 'content_block_delta' && decoded.delta?.text) {
         full += decoded.delta.text
       }
@@ -172,8 +181,9 @@ Rules:
 // --- Markdown generators ---
 function today() { return new Date().toISOString().slice(0, 10) }
 
-function genIndex(title, author, chapterTitles) {
-  const list = chapterTitles.map((t, i) => `${i + 1}. [[chapters/${t}]]`).join('\n')
+function genIndex(title, author, chapterEntries) {
+  // chapterEntries: Array<{title, slug}>
+  const list = chapterEntries.map((ch, i) => `${i + 1}. [[chapters/${ch.slug}|${ch.title}]]`).join('\n')
   return `---\ntitle: "${title}"\nauthor: "${author}"\ntype: book\ncreated: ${today()}\nupdated: ${today()}\n---\n\n# ${title}\n\n**Author:** ${author}\n\n## Chapters\n\n${list}\n`
 }
 
@@ -254,9 +264,8 @@ async function main() {
   try {
     chapters = await extractChapters(epubPath)
   } catch (err) {
-    // epubjs may not work in Node, fallback to simple approach
-    console.log('epubjs failed in Node, using proxy to extract...')
-    console.error(err.message)
+    // Fallback: create minimal wiki if EPUB parsing fails
+    console.log('EPUB extraction failed:', err.message)
     // Fallback: just create a minimal wiki with book metadata
     fs.mkdirSync(wikiDir, { recursive: true })
     fs.writeFileSync(path.join(wikiDir, 'index.md'), genIndex(bookTitle, bookAuthor, []))
@@ -282,30 +291,26 @@ async function main() {
   const failedChapters = []
   const existingConcepts = []
 
+  async function processChapter(ch, label) {
+    console.log(`${label} ${ch.title}`)
+    const conceptsCtx = existingConcepts.length > 0
+      ? `\n\n**Already extracted concepts (avoid duplicates):**\n${existingConcepts.join('\n')}`
+      : ''
+    const prompt = `**Book:** "${bookTitle}" by ${bookAuthor}\n\n**Chapter text:**\n${ch.text}${conceptsCtx}`
+
+    const response = await chat(SYSTEM_PROMPT, prompt)
+    const parsed = extractJson(response)
+    results.push({ title: ch.title, slug: ch.slug, result: parsed })
+    for (const c of parsed.concepts ?? []) existingConcepts.push(c.slug)
+    console.log(`   → ${parsed.concepts?.length ?? 0} concepts, ${parsed.entities?.length ?? 0} entities`)
+  }
+
   for (let i = 0; i < chapters.length; i++) {
-    const ch = chapters[i]
-    console.log(`[${i + 1}/${chapters.length}] ${ch.title}`)
-
-    let prompt = `**Book:** "${bookTitle}" by ${bookAuthor}\n\n**Chapter text:**\n${ch.text}`
-    if (existingConcepts.length > 0) {
-      prompt += `\n\n**Already extracted concepts (avoid duplicates):**\n${existingConcepts.join('\n')}`
-    }
-
     try {
-      const response = await chat(SYSTEM_PROMPT, prompt)
-      const parsed = extractJson(response)
-      results.push({ title: ch.title, slug: ch.slug, result: parsed })
-
-      for (const c of parsed.concepts ?? []) {
-        existingConcepts.push(c.slug)
-      }
-
-      const nC = parsed.concepts?.length ?? 0
-      const nE = parsed.entities?.length ?? 0
-      console.log(`   → ${nC} concepts, ${nE} entities`)
+      await processChapter(chapters[i], `[${i + 1}/${chapters.length}]`)
     } catch (err) {
       console.error(`   ✗ Failed: ${err.message}`)
-      failedChapters.push(ch)
+      failedChapters.push(chapters[i])
     }
   }
 
@@ -313,20 +318,8 @@ async function main() {
   if (failedChapters.length > 0) {
     console.log(`\nRetrying ${failedChapters.length} failed chapters...`)
     for (let i = 0; i < failedChapters.length; i++) {
-      const ch = failedChapters[i]
-      console.log(`[retry ${i + 1}/${failedChapters.length}] ${ch.title}`)
-
-      let prompt = `**Book:** "${bookTitle}" by ${bookAuthor}\n\n**Chapter text:**\n${ch.text}`
-      if (existingConcepts.length > 0) {
-        prompt += `\n\n**Already extracted concepts (avoid duplicates):**\n${existingConcepts.join('\n')}`
-      }
-
       try {
-        const response = await chat(SYSTEM_PROMPT, prompt)
-        const parsed = extractJson(response)
-        results.push({ title: ch.title, slug: ch.slug, result: parsed })
-        for (const c of parsed.concepts ?? []) existingConcepts.push(c.slug)
-        console.log(`   → ${parsed.concepts?.length ?? 0} concepts, ${parsed.entities?.length ?? 0} entities`)
+        await processChapter(failedChapters[i], `[retry ${i + 1}/${failedChapters.length}]`)
       } catch (err) {
         console.error(`   ✗ Still failed: ${err.message}`)
       }
@@ -358,7 +351,7 @@ async function main() {
   }
 
   // Write index
-  fs.writeFileSync(path.join(wikiDir, 'index.md'), genIndex(bookTitle, bookAuthor, results.map(r => r.title)))
+  fs.writeFileSync(path.join(wikiDir, 'index.md'), genIndex(bookTitle, bookAuthor, results.map(r => ({ title: r.title, slug: r.slug }))))
 
   // Write chapters
   for (const ch of results) {
