@@ -20,7 +20,8 @@ import { initWiki, type ChapterText } from './wiki/initWiki'
 import { updateWiki } from './wiki/updateWiki'
 import { readChapterConcepts } from './wiki/readWiki'
 import { buildWikiContextBlock } from './wiki/prompts'
-import { nodeSlug } from './wiki/slugify'
+import { bookSlug, nodeSlug } from './wiki/slugify'
+import { listWikiFiles } from './wiki/readWiki'
 
 export default function App() {
   const [view, setViewState] = useState<AppView>('bookshelf')
@@ -105,12 +106,27 @@ export default function App() {
     if (book) {
       setCurrentBook(book)
       if (!book.wikiReady) {
-        extractChaptersFromBook(book, fileData).then(chapters => {
-          if (chapters.length > 0) {
-            initWiki(book, chapters).then(slug => {
-              setCurrentBook(prev => prev ? { ...prev, wikiSlug: slug, wikiReady: true } : prev)
-            }).catch(err => console.error('Wiki init failed:', err))
+        // Check if wiki was already initialized externally (e.g. via CLI script)
+        const slug = bookSlug(book.title, book.author)
+        listWikiFiles(slug).then(async files => {
+          if (files.length > 0) {
+            // Wiki exists on disk — just mark it ready in IndexedDB
+            const updatedBook = { ...book, wikiSlug: slug, wikiReady: true, updatedAt: Date.now() }
+            const db = await getStore()
+            await db.updateBook(updatedBook)
+            setCurrentBook(prev => prev ? { ...prev, wikiSlug: slug, wikiReady: true } : prev)
+          } else {
+            // No wiki yet — initialize from EPUB
+            extractChaptersFromBook(book, fileData).then(chapters => {
+              if (chapters.length > 0) {
+                initWiki(book, chapters).then(wikiSlug => {
+                  setCurrentBook(prev => prev ? { ...prev, wikiSlug, wikiReady: true } : prev)
+                }).catch(err => console.error('Wiki init failed:', err))
+              }
+            })
           }
+        }).catch(() => {
+          // Proxy not running — skip wiki
         })
       }
     }
