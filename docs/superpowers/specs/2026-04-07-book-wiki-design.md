@@ -104,7 +104,7 @@ Triggered asynchronously after book import. Does not block reading.
 **AI output format** (per chapter):
 ```json
 {
-  "chapter_summary": "...",
+  "summary": "...",
   "concepts": [
     { "title": "...", "slug": "...", "summary": "...", "related": ["..."] }
   ],

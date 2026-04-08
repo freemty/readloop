@@ -1,11 +1,3 @@
-export interface WikiMeta {
-  slug: string
-  bookId: string
-  bookTitle: string
-  bookAuthor: string
-  ready: boolean
-}
-
 export interface InitChapterResult {
   summary: string
   concepts: ConceptInit[]

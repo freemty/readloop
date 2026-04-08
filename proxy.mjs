@@ -261,12 +261,25 @@ async function handleLocalFile(filePath, res) {
 // ========== Wiki File I/O ==========
 const WIKI_ROOT = path.join(os.homedir(), 'readloop', 'wikis')
 
+function isValidSlug(slug) {
+  if (!slug || typeof slug !== 'string') return false
+  // Only allow safe characters: alphanumeric, CJK, hyphens, underscores
+  if (/[\/\\]|\.\./.test(slug)) return false
+  const resolved = path.resolve(path.join(WIKI_ROOT, slug))
+  return resolved.startsWith(path.resolve(WIKI_ROOT) + path.sep)
+}
+
 async function handleWikiInit(req, res) {
   let body = ''
   for await (const chunk of req) body += chunk
 
   try {
     const { slug, files } = JSON.parse(body)
+    if (!isValidSlug(slug)) {
+      res.writeHead(403, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+      res.end(JSON.stringify({ error: 'Invalid slug' }))
+      return
+    }
     const wikiDir = path.join(WIKI_ROOT, slug)
     const dirs = new Set()
 
@@ -297,9 +310,9 @@ async function handleWikiRead(url, res) {
   const slug = url.searchParams.get('slug')
   const filePath = url.searchParams.get('path')
 
-  if (!slug) {
+  if (!isValidSlug(slug)) {
     res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
-    res.end(JSON.stringify({ error: 'Missing slug parameter' }))
+    res.end(JSON.stringify({ error: 'Missing or invalid slug parameter' }))
     return
   }
 
@@ -357,6 +370,11 @@ async function handleWikiUpdate(req, res) {
 
   try {
     const { slug, files } = JSON.parse(body)
+    if (!isValidSlug(slug)) {
+      res.writeHead(403, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+      res.end(JSON.stringify({ error: 'Invalid slug' }))
+      return
+    }
     const wikiDir = path.join(WIKI_ROOT, slug)
     const resolvedWiki = path.resolve(wikiDir)
 

@@ -14,7 +14,10 @@ interface UpdateFile {
   bumpTo?: string
 }
 
+const VALID_CONFIDENCE = ['low', 'medium', 'high'] as const
+
 export function applyBumpConfidence(content: string, to: string): string {
+  if (!VALID_CONFIDENCE.includes(to as typeof VALID_CONFIDENCE[number])) return content
   return content.replace(/confidence: (low|medium|high)/, `confidence: ${to}`)
 }
 
@@ -145,11 +148,14 @@ export async function updateWiki(
 
     const validFiles = finalFiles.filter((f): f is NonNullable<typeof f> => f !== null)
 
-    await fetch(`${WIKI_BASE}/update`, {
+    const writeResponse = await fetch(`${WIKI_BASE}/update`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug, files: validFiles }),
     })
+    if (!writeResponse.ok) {
+      console.error(`Wiki update write failed: ${writeResponse.status}`)
+    }
   } catch (err) {
     console.error('Wiki update failed:', err)
   }

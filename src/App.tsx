@@ -107,26 +107,25 @@ export default function App() {
       if (!book.wikiReady) {
         // Check if wiki was already initialized externally (e.g. via CLI script)
         const slug = bookSlug(book.title, book.author)
-        listWikiFiles(slug).then(async files => {
-          if (files.length > 0) {
-            // Wiki exists on disk — just mark it ready in IndexedDB
-            const updatedBook = { ...book, wikiSlug: slug, wikiReady: true, updatedAt: Date.now() }
-            const db = await getStore()
-            await db.updateBook(updatedBook)
-            setCurrentBook(prev => prev ? { ...prev, wikiSlug: slug, wikiReady: true } : prev)
-          } else {
-            // No wiki yet — initialize from EPUB
-            extractChaptersFromBook(book, fileData).then(chapters => {
+        ;(async () => {
+          try {
+            const files = await listWikiFiles(slug)
+            if (files.length > 0) {
+              const updatedBook = { ...book, wikiSlug: slug, wikiReady: true, updatedAt: Date.now() }
+              const freshDb = await getStore()
+              await freshDb.updateBook(updatedBook)
+              setCurrentBook(prev => prev ? { ...prev, wikiSlug: slug, wikiReady: true } : prev)
+            } else {
+              const chapters = await extractChaptersFromBook(book, fileData)
               if (chapters.length > 0) {
-                initWiki(book, chapters).then(wikiSlug => {
-                  setCurrentBook(prev => prev ? { ...prev, wikiSlug, wikiReady: true } : prev)
-                }).catch(err => console.error('Wiki init failed:', err))
+                const wikiSlug = await initWiki(book, chapters)
+                setCurrentBook(prev => prev ? { ...prev, wikiSlug, wikiReady: true } : prev)
               }
-            })
+            }
+          } catch {
+            // Proxy not running or wiki init failed — skip wiki
           }
-        }).catch(() => {
-          // Proxy not running — skip wiki
-        })
+        })()
       }
     }
     setPdfData(fileData)

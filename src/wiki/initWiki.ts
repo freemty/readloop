@@ -215,13 +215,20 @@ export async function initWiki(book: Book, chapters: ChapterText[]): Promise<str
     }
   }
 
+  if (results.length === 0 && chapters.length > 0) {
+    throw new Error(`Wiki init failed: all ${chapters.length} chapters failed AI extraction`)
+  }
+
   const files = buildWikiFiles(book.title, book.author, results)
 
-  await fetch(`${WIKI_BASE}/init`, {
+  const response = await fetch(`${WIKI_BASE}/init`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ slug, files }),
   })
+  if (!response.ok) {
+    throw new Error(`Wiki init write failed: ${response.status}`)
+  }
 
   const db = await getStore()
   await db.updateBook({ ...book, wikiSlug: slug, wikiReady: true, updatedAt: Date.now() })
