@@ -33,15 +33,36 @@ export function parseMarkdownFrontmatter(markdown: string): WikiNode {
   return node
 }
 
-export async function readWikiNode(slug: string, filePath: string): Promise<WikiNode | null> {
+export async function readWikiRaw(slug: string, filePath: string): Promise<string | null> {
   try {
     const response = await fetch(
       `${WIKI_BASE}/read?slug=${encodeURIComponent(slug)}&path=${encodeURIComponent(filePath)}`
     )
     if (!response.ok) return null
     const { content } = await response.json()
-    return parseMarkdownFrontmatter(content)
+    return content
   } catch { return null }
+}
+
+export function extractJson<T = unknown>(text: string): T {
+  let str = text.trim()
+  const fenceMatch = str.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)
+  if (fenceMatch) str = fenceMatch[1].trim()
+  try { return JSON.parse(str) } catch { /* fall through */ }
+  const firstBrace = str.indexOf('{')
+  const lastBrace = str.lastIndexOf('}')
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    const candidate = str.slice(firstBrace, lastBrace + 1)
+    try { return JSON.parse(candidate) } catch { /* fall through */ }
+    const fixed = candidate.replace(/,\s*([}\]])/g, '$1')
+    return JSON.parse(fixed)
+  }
+  throw new Error(`Could not extract valid JSON (length: ${text.length})`)
+}
+
+export async function readWikiNode(slug: string, filePath: string): Promise<WikiNode | null> {
+  const raw = await readWikiRaw(slug, filePath)
+  return raw ? parseMarkdownFrontmatter(raw) : null
 }
 
 export async function listWikiFiles(slug: string): Promise<string[]> {
@@ -74,13 +95,12 @@ export async function readChapterConcepts(
   const toRead = linkedSlugs.size > 0
     ? conceptFiles.filter(f => linkedSlugs.has(f))
     : conceptFiles.slice(0, 5)
-  const results: { title: string; confidence: string; summary: string }[] = []
-  for (const file of toRead) {
-    const node = await readWikiNode(slug, file)
-    if (node?.title) {
-      const summary = node.body.split('\n\n')[0] ?? ''
-      results.push({ title: node.title, confidence: node.confidence ?? 'low', summary: summary.slice(0, 200) })
-    }
-  }
-  return results
+  const nodes = await Promise.all(toRead.map(file => readWikiNode(slug, file)))
+  return nodes
+    .filter((node): node is WikiNode => node !== null && node.title !== undefined)
+    .map(node => ({
+      title: node.title!,
+      confidence: node.confidence ?? 'low',
+      summary: (node.body.split('\n\n')[0] ?? '').slice(0, 200),
+    }))
 }

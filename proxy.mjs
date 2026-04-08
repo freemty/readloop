@@ -308,7 +308,8 @@ async function handleWikiRead(url, res) {
   try {
     if (filePath) {
       const fullPath = path.resolve(path.join(wikiDir, filePath))
-      if (!fullPath.startsWith(path.resolve(wikiDir))) {
+      const resolvedWiki = path.resolve(wikiDir)
+      if (!fullPath.startsWith(resolvedWiki + path.sep) && fullPath !== resolvedWiki) {
         res.writeHead(403, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
         res.end(JSON.stringify({ error: 'Path traversal denied' }))
         return
@@ -357,10 +358,11 @@ async function handleWikiUpdate(req, res) {
   try {
     const { slug, files } = JSON.parse(body)
     const wikiDir = path.join(WIKI_ROOT, slug)
+    const resolvedWiki = path.resolve(wikiDir)
 
     for (const file of files) {
       const fullPath = path.resolve(path.join(wikiDir, file.path))
-      if (!fullPath.startsWith(path.resolve(wikiDir))) continue
+      if (!fullPath.startsWith(resolvedWiki + path.sep) && fullPath !== resolvedWiki) continue
 
       const dir = path.dirname(fullPath)
       fs.mkdirSync(dir, { recursive: true })

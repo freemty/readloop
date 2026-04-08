@@ -18,10 +18,9 @@ import type { AppView, Annotation, Book, Message } from './types'
 import type { ScreenshotBbox } from './pdf/ScreenshotTool'
 import { initWiki, type ChapterText } from './wiki/initWiki'
 import { updateWiki } from './wiki/updateWiki'
-import { readChapterConcepts } from './wiki/readWiki'
+import { readChapterConcepts, listWikiFiles } from './wiki/readWiki'
 import { buildWikiContextBlock } from './wiki/prompts'
 import { bookSlug, nodeSlug } from './wiki/slugify'
-import { listWikiFiles } from './wiki/readWiki'
 
 export default function App() {
   const [view, setViewState] = useState<AppView>('bookshelf')
@@ -154,7 +153,7 @@ export default function App() {
             return item.href.endsWith(tocBase) || tocBase.endsWith(item.href)
           })
           const title = navItem?.label?.trim() ?? `Section ${chapterIndex + 1}`
-          const slug = `${String(chapterIndex + 1).padStart(2, '0')}-${title.replace(/[\/\\:]/g, '-').slice(0, 50)}`
+          const slug = `${String(chapterIndex + 1).padStart(2, '0')}-${nodeSlug(title).slice(0, 50)}`
           chapters.push({ title, slug, text: text.slice(0, 8000) })
           chapterIndex++
         } catch {
@@ -425,7 +424,7 @@ export default function App() {
   const handleParagraphsReady = useCallback((paragraphs: { index: number; text: string }[], _page: number, chapter?: string) => {
     setCurrentParagraphs(paragraphs)
     setCurrentParagraphIndex(0)
-    if (chapter !== undefined) setCurrentChapter(chapter)
+    if (chapter !== undefined) setCurrentChapter(prev => prev === chapter ? prev : chapter)
   }, [])
 
   // Trigger guide when enabled and paragraphs change

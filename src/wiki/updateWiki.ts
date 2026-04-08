@@ -3,7 +3,7 @@ import { createAiClient } from '../ai/client'
 import { loadSettings } from '../settings/SettingsModal'
 import { wikiUpdateSystemPrompt, buildUpdateJudgmentPrompt } from './prompts'
 import { generateConceptFile, generateEntityFile } from './initWiki'
-import { listWikiFiles, readWikiNode } from './readWiki'
+import { listWikiFiles, readWikiNode, readWikiRaw, extractJson } from './readWiki'
 import type { UpdateJudgment } from './types'
 import type { Book, Message } from '../types'
 
@@ -11,6 +11,7 @@ interface UpdateFile {
   path: string
   content: string
   mode: 'write' | 'append'
+  bumpTo?: string
 }
 
 export function applyBumpConfidence(content: string, to: string): string {
@@ -67,8 +68,9 @@ export function buildUpdateFiles(
         if (!update.target || !update.to) break
         files.push({
           path: update.target,
-          content: `__BUMP_CONFIDENCE__:${update.to}`,
+          content: '',
           mode: 'write',
+          bumpTo: update.to,
         })
         break
       }
@@ -96,15 +98,14 @@ export async function updateWiki(
   const slug = book.wikiSlug
   const files = await listWikiFiles(slug)
   const conceptFiles = files.filter(f => f.startsWith('concepts/'))
-  const existingNodes: string[] = []
 
-  for (const f of conceptFiles.slice(0, 10)) {
-    const node = await readWikiNode(slug, f)
-    if (node?.title) {
-      const summary = node.body.split('\n\n')[0] ?? ''
-      existingNodes.push(`${node.title}: ${summary.slice(0, 100)}`)
-    }
-  }
+  // Read concept nodes in parallel
+  const conceptNodes = await Promise.all(
+    conceptFiles.slice(0, 10).map(f => readWikiNode(slug, f))
+  )
+  const existingNodes = conceptNodes
+    .filter((node): node is NonNullable<typeof node> => node !== null && node.title !== undefined)
+    .map(node => `${node.title}: ${(node.body.split('\n\n')[0] ?? '').slice(0, 100)}`)
 
   const convFiles = files.filter(f => f.startsWith(`conversations/${chapterSlug}`))
   const conversationIndex = convFiles.length + 1
@@ -126,30 +127,28 @@ export async function updateWiki(
       () => {},
     )
 
-    const judgment: UpdateJudgment = JSON.parse(response)
+    const judgment = extractJson<UpdateJudgment>(response)
     const updateFiles = buildUpdateFiles(judgment, chapterSlug, conversationIndex, currentChapter)
     if (updateFiles.length === 0) return
 
-    const finalFiles: { path: string; content: string; mode: string }[] = []
-    for (const f of updateFiles) {
-      if (f.content.startsWith('__BUMP_CONFIDENCE__:')) {
-        const newConfidence = f.content.split(':')[1]
-        const node = await readWikiNode(slug, f.path)
-        if (node) {
-          const fullContent = await fetch(
-            `${WIKI_BASE}/read?slug=${encodeURIComponent(slug)}&path=${encodeURIComponent(f.path)}`
-          ).then(r => r.json()).then(d => d.content)
-          finalFiles.push({ path: f.path, content: applyBumpConfidence(fullContent, newConfidence), mode: 'write' })
+    // Resolve bump_confidence: read raw content, apply replacement
+    const finalFiles = await Promise.all(
+      updateFiles.map(async (f) => {
+        if (f.bumpTo) {
+          const raw = await readWikiRaw(slug, f.path)
+          if (!raw) return null
+          return { path: f.path, content: applyBumpConfidence(raw, f.bumpTo), mode: 'write' as const }
         }
-      } else {
-        finalFiles.push(f)
-      }
-    }
+        return { path: f.path, content: f.content, mode: f.mode }
+      })
+    )
+
+    const validFiles = finalFiles.filter((f): f is NonNullable<typeof f> => f !== null)
 
     await fetch(`${WIKI_BASE}/update`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug, files: finalFiles }),
+      body: JSON.stringify({ slug, files: validFiles }),
     })
   } catch (err) {
     console.error('Wiki update failed:', err)

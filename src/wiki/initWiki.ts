@@ -3,6 +3,7 @@ import { createAiClient } from '../ai/client'
 import { loadSettings } from '../settings/SettingsModal'
 import { bookSlug } from './slugify'
 import { wikiInitSystemPrompt, buildInitPrompt } from './prompts'
+import { extractJson } from './readWiki'
 import type { InitChapterResult } from './types'
 import type { Book } from '../types'
 import { getStore } from '../db/store'
@@ -204,7 +205,7 @@ export async function initWiki(book: Book, chapters: ChapterText[]): Promise<str
         [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
         () => {},
       )
-      const parsed: InitChapterResult = JSON.parse(response)
+      const parsed = extractJson<InitChapterResult>(response)
       results.push({ title: chapter.title, slug: chapter.slug, result: parsed })
       for (const c of parsed.concepts) {
         existingConcepts.push(c.slug)
