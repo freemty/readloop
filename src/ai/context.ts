@@ -71,13 +71,20 @@ export function buildAskContext(input: AskContextInput): PromptPair {
 
   const systemPrompt = askSystemPrompt(bookTitle, bookAuthor, mode)
 
+  const MAX_HISTORY_TURNS = 20
+  const maxHistoryMessages = MAX_HISTORY_TURNS * 2
+
   const historyMessages: ContextMessage[] = (input.conversationHistory ?? []).map(
     (msg) => ({ role: msg.role, content: msg.content }),
   )
 
+  const trimmedHistory = historyMessages.length > maxHistoryMessages
+    ? historyMessages.slice(historyMessages.length - maxHistoryMessages)
+    : historyMessages
+
   const messages: ContextMessage[] = [
     { role: 'system', content: systemPrompt },
-    ...historyMessages,
+    ...trimmedHistory,
     { role: 'user', content: userPrompt },
   ]
 

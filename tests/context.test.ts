@@ -58,6 +58,32 @@ describe('buildAskContext', () => {
     expect(result.systemPrompt).toContain('The Wealth of Nations')
     expect(result.userPrompt).toContain('What does this mean?')
   })
+
+  it('trims old history when conversation exceeds max turns', () => {
+    const longHistory: { role: 'user' | 'assistant'; content: string; timestamp: number }[] = []
+    for (let i = 0; i < 40; i++) {
+      longHistory.push({ role: 'user', content: `Question ${i}`, timestamp: i * 1000 })
+      longHistory.push({ role: 'assistant', content: `Answer ${i}`, timestamp: i * 1000 + 500 })
+    }
+
+    const result = buildAskContext({
+      bookTitle: 'Test',
+      bookAuthor: 'Author',
+      currentChapter: '',
+      paragraphs: ['Text.'],
+      currentParagraphIndex: 0,
+      selectedText: 'Text.',
+      userQuery: 'New question?',
+      nearbyAnnotations: [],
+      conversationHistory: longHistory,
+    })
+
+    // system + trimmed history (40 msgs) + new user = 42
+    expect(result.messages.length).toBeLessThanOrEqual(42)
+    // Most recent messages preserved
+    const lastHistoryMsg = result.messages[result.messages.length - 2]
+    expect(lastHistoryMsg.content).toBe('Answer 39')
+  })
 })
 
 describe('buildGuideContext', () => {
