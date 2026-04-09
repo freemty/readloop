@@ -16,9 +16,11 @@ That's what ReadLoop does.
 
 **Reading**: EPUB with continuous scroll + PDF with selectable text layer. Z-Library search/download built in. Also scans local Downloads/Documents/Desktop for books.
 
-**AI conversations**: Select any text and ask AI directly, or type in the side panel (automatically includes current page as context). Turn on Guide Mode and AI generates per-paragraph cards — what this paragraph says, historical background, relevance to today. Can't select text in a scanned PDF? Screenshot a region and send it to AI via Vision.
+**AI conversations**: Select any text and ask AI directly, or type in the side panel (automatically includes current page as context). Supports multi-turn follow-ups — the AI remembers what you asked before, no need to repeat context. Turn on Guide Mode and AI generates per-paragraph cards — what this paragraph says, historical background, relevance to today. Can't select text in a scanned PDF? Screenshot a region and send it to AI via Vision.
 
-**Annotations**: Four highlight colors, notes, and conversation logs — all anchored to exact positions in the text. Click any annotation in the sidebar to jump there.
+**Annotations**: Four highlight colors, notes, and conversation logs — all anchored to exact positions in the text. Places where you've chatted show an orange dotted underline with a 💬 badge — click to reopen the conversation.
+
+**Knowledge graph**: Each book gets an auto-generated Obsidian-compatible wiki — AI extracts core concepts chapter by chapter on first open, then updates the wiki when conversations surface something worth keeping. Next time you ask a question, the AI draws on your accumulated understanding. Wiki files live in `wikis/` and can be browsed directly in Obsidian.
 
 **Everything stays local**: IndexedDB stores books, annotations, covers. One-click JSON export. No cloud dependency.
 
