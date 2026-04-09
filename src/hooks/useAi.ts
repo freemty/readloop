@@ -3,7 +3,7 @@ import { createAiClient, type ChatMessage } from '../ai/client'
 import { buildAskContext, buildGuideContext } from '../ai/context'
 import { loadSettings } from '../settings/SettingsModal'
 import type { AiMode } from '../ai/prompts'
-import type { Annotation } from '../types'
+import type { Annotation, Message } from '../types'
 
 interface UseAiReturn {
   isLoading: boolean
@@ -25,6 +25,8 @@ interface AskParams {
   userQuery: string
   nearbyAnnotations: Annotation[]
   mode?: AiMode
+  wikiContext?: string
+  conversationHistory?: Message[]
 }
 
 interface GuideParams {
@@ -43,8 +45,7 @@ export function useAi(): UseAiReturn {
   const abortRef = useRef(false)
 
   const callAi = useCallback(async (
-    systemPrompt: string,
-    userPrompt: string,
+    messages: ChatMessage[],
   ): Promise<string> => {
     const settings = loadSettings()
     if (settings.provider !== 'bedrock' && !settings.apiKey) {
@@ -65,10 +66,7 @@ export function useAi(): UseAiReturn {
 
     try {
       const result = await client.chat(
-        [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
+        messages,
         (chunk) => {
           if (!abortRef.current) {
             setStreamingText(prev => prev + chunk)
@@ -86,8 +84,8 @@ export function useAi(): UseAiReturn {
   }, [])
 
   const askAi = useCallback(async (params: AskParams): Promise<string> => {
-    const { systemPrompt, userPrompt } = buildAskContext(params)
-    return callAi(systemPrompt, userPrompt)
+    const context = buildAskContext(params)
+    return callAi(context.messages as ChatMessage[])
   }, [callAi])
 
   const askWithImage = useCallback(async (systemPrompt: string, userText: string, imageDataUrl: string): Promise<string> => {
@@ -139,8 +137,8 @@ export function useAi(): UseAiReturn {
   }, [])
 
   const getGuide = useCallback(async (params: GuideParams): Promise<string> => {
-    const { systemPrompt, userPrompt } = buildGuideContext(params)
-    return callAi(systemPrompt, userPrompt)
+    const context = buildGuideContext(params)
+    return callAi(context.messages as ChatMessage[])
   }, [callAi])
 
   const cancelStream = useCallback(() => {
