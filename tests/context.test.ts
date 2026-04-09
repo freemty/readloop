@@ -1,20 +1,61 @@
 import { describe, it, expect } from 'vitest'
 import { buildAskContext, buildGuideContext } from '../src/ai/context'
+import type { Message } from '../src/types'
 
 describe('buildAskContext', () => {
+  const baseInput = {
+    bookTitle: 'The Wealth of Nations',
+    bookAuthor: 'Adam Smith',
+    currentChapter: 'Chapter 1',
+    paragraphs: ['Para before.', 'The selected paragraph text here.', 'Para after.'],
+    currentParagraphIndex: 1,
+    selectedText: 'selected paragraph',
+    userQuery: 'What does this mean?',
+    nearbyAnnotations: [],
+  }
+
   it('assembles context for ask mode', () => {
-    const result = buildAskContext({
-      bookTitle: 'The Wealth of Nations',
-      bookAuthor: 'Adam Smith',
-      currentChapter: 'Chapter 1',
-      paragraphs: ['Para before.', 'The selected paragraph text here.', 'Para after.'],
-      currentParagraphIndex: 1,
-      selectedText: 'selected paragraph',
-      userQuery: 'What does this mean?',
-      nearbyAnnotations: [],
-    })
+    const result = buildAskContext(baseInput)
     expect(result.systemPrompt).toContain('The Wealth of Nations')
     expect(result.userPrompt).toContain('selected paragraph')
+    expect(result.userPrompt).toContain('What does this mean?')
+  })
+
+  it('without history returns messages array with system + user (2 messages) and legacy fields', () => {
+    const result = buildAskContext(baseInput)
+
+    // Legacy fields still present
+    expect(result.systemPrompt).toBeTruthy()
+    expect(result.userPrompt).toBeTruthy()
+
+    // messages array: [system, user]
+    expect(result.messages).toHaveLength(2)
+    expect(result.messages[0].role).toBe('system')
+    expect(result.messages[0].content).toBe(result.systemPrompt)
+    expect(result.messages[1].role).toBe('user')
+    expect(result.messages[1].content).toBe(result.userPrompt)
+  })
+
+  it('with conversationHistory returns messages array: [system, ...history, user]', () => {
+    const history: Message[] = [
+      { role: 'user', content: 'What is the invisible hand?', timestamp: 1000 },
+      { role: 'assistant', content: 'It refers to the unintended social benefits...', timestamp: 2000 },
+    ]
+
+    const result = buildAskContext({ ...baseInput, conversationHistory: history })
+
+    // messages: system + 2 history + user = 4
+    expect(result.messages).toHaveLength(4)
+    expect(result.messages[0].role).toBe('system')
+    expect(result.messages[1].role).toBe('user')
+    expect(result.messages[1].content).toBe('What is the invisible hand?')
+    expect(result.messages[2].role).toBe('assistant')
+    expect(result.messages[2].content).toBe('It refers to the unintended social benefits...')
+    expect(result.messages[3].role).toBe('user')
+    expect(result.messages[3].content).toBe(result.userPrompt)
+
+    // Legacy fields still present
+    expect(result.systemPrompt).toContain('The Wealth of Nations')
     expect(result.userPrompt).toContain('What does this mean?')
   })
 })

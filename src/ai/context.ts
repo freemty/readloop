@@ -1,6 +1,6 @@
 import { askSystemPrompt, guideSystemPrompt } from './prompts'
 import type { AiMode } from './prompts'
-import type { Annotation } from '../types'
+import type { Annotation, Message } from '../types'
 
 interface AskContextInput {
   bookTitle: string
@@ -13,6 +13,7 @@ interface AskContextInput {
   nearbyAnnotations: Annotation[]
   mode?: AiMode
   wikiContext?: string
+  conversationHistory?: Message[]
 }
 
 interface GuideContextInput {
@@ -24,9 +25,15 @@ interface GuideContextInput {
   recentGuideSummaries: string[]
 }
 
+interface ContextMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
 interface PromptPair {
   systemPrompt: string
   userPrompt: string
+  messages: ContextMessage[]
 }
 
 export function buildAskContext(input: AskContextInput): PromptPair {
@@ -62,9 +69,22 @@ export function buildAskContext(input: AskContextInput): PromptPair {
     userPrompt += input.wikiContext
   }
 
+  const systemPrompt = askSystemPrompt(bookTitle, bookAuthor, mode)
+
+  const historyMessages: ContextMessage[] = (input.conversationHistory ?? []).map(
+    (msg) => ({ role: msg.role, content: msg.content }),
+  )
+
+  const messages: ContextMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...historyMessages,
+    { role: 'user', content: userPrompt },
+  ]
+
   return {
-    systemPrompt: askSystemPrompt(bookTitle, bookAuthor, mode),
+    systemPrompt,
     userPrompt,
+    messages,
   }
 }
 
@@ -86,8 +106,14 @@ export function buildGuideContext(input: GuideContextInput): PromptPair {
     userPrompt += `\n\n**Previous guide summaries (for continuity):**\n${recentGuideSummaries.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
   }
 
+  const systemPrompt = guideSystemPrompt(bookTitle, bookAuthor)
+
   return {
-    systemPrompt: guideSystemPrompt(bookTitle, bookAuthor),
+    systemPrompt,
     userPrompt,
+    messages: [
+      { role: 'system' as const, content: systemPrompt },
+      { role: 'user' as const, content: userPrompt },
+    ],
   }
 }
