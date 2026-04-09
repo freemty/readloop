@@ -327,6 +327,7 @@ export default function App() {
         nearbyAnnotations: annotations,
         mode: aiMode,
         wikiContext,
+        conversationHistory: activeConversation ?? [],
       })
 
       const assistantMsg: Message = { role: 'assistant', content: result, timestamp: Date.now() }
@@ -355,7 +356,7 @@ export default function App() {
     } catch {
       // error is handled by useAi hook
     }
-  }, [currentBook, selectedText, annotations, activeAnnotationId, ai, updateAnnotation, aiMode, currentChapter])
+  }, [currentBook, selectedText, annotations, activeAnnotationId, ai, updateAnnotation, aiMode, currentChapter, activeConversation])
 
   const handleHighlight = useCallback((color: string) => {
     setSelectionMenuPos(null)
