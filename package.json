@@ -4,8 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
+    "proxy": "set -a && source .env && set +a && node proxy.mjs",
+    "start": "sh start.sh",
     "build": "tsc -b && vite build",
+    "test:providers": "node scripts/test-providers.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
