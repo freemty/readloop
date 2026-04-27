@@ -30,7 +30,7 @@ export function createAiClient(config: AiClientConfig): AiClient {
   const provider = config.provider
 
   if (provider === 'bedrock') {
-    const model = config.model ?? 'arn:aws:bedrock:ap-northeast-1:996669628573:application-inference-profile/1kshwq870gk4'
+    const model = config.model ?? 'arn:aws:bedrock:us-east-2:533595510084:inference-profile/us.anthropic.claude-sonnet-4-6'
     const proxyUrl = config.baseUrl ?? 'http://localhost:3001/api/bedrock/chat'
     return {
       async chat(messages, onChunk) {

@@ -17,16 +17,22 @@ interface SettingsModalProps {
 }
 
 const PRESETS: Record<string, { provider: AiProvider; baseUrl: string; model: string; apiKey?: string }> = {
+  siliconflow: {
+    provider: 'openai',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    model: 'claude-sonnet-4',
+    apiKey: import.meta.env.VITE_SILICONFLOW_API_KEY ?? '',
+  },
   bedrock: {
     provider: 'bedrock',
     baseUrl: 'http://localhost:3001/api/bedrock/chat',
-    model: 'arn:aws:bedrock:ap-northeast-1:996669628573:application-inference-profile/1kshwq870gk4',
+    model: 'arn:aws:bedrock:us-east-2:533595510084:inference-profile/us.anthropic.claude-sonnet-4-6',
     apiKey: 'bedrock',
   },
   yunstorm: {
     provider: 'openai',
-    baseUrl: 'https://gpt.yunstorm.com/v1',
-    model: 'claude-sonnet-4',
+    baseUrl: 'https://dl.yunstorm.com/v1',
+    model: 'gpt-4.1',
     apiKey: import.meta.env.VITE_YUNSTORM_API_KEY ?? '',
   },
   openai: {
@@ -206,7 +212,8 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
                           transition: 'all 0.15s',
                         }}
                       >
-                        {name === 'bedrock' ? 'Bedrock Claude'
+                        {name === 'siliconflow' ? 'SiliconFlow'
+                          : name === 'bedrock' ? 'Bedrock Claude'
                           : name === 'yunstorm' ? 'Yunstorm'
                           : name === 'openai' ? 'OpenAI'
                           : 'Claude Direct'}

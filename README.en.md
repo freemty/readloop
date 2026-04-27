@@ -37,11 +37,12 @@ cd readloop && npm install
 cp .env.example .env
 # Fill in AWS credentials and API keys
 
-npx vite --host          # Frontend
-node proxy.mjs           # Proxy (Z-Library + Bedrock)
+npm start                # Starts both frontend + proxy
 ```
 
-Open http://localhost:5173/
+Open http://localhost:5174/
+
+Or run separately: `npm run dev` (frontend) + `npm run proxy` (proxy)
 
 ## Environment variables
 

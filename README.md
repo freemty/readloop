@@ -37,11 +37,12 @@ cd readloop && npm install
 cp .env.example .env
 # 填 AWS 凭证和 API key
 
-npx vite --host          # 前端
-node proxy.mjs           # 代理（Z-Library + Bedrock）
+npm start                # 一键启动前端 + 代理
 ```
 
-打开 http://localhost:5173/
+打开 http://localhost:5174/
+
+也可以分开启动：`npm run dev`（前端）+ `npm run proxy`（代理）
 
 ## 环境变量
 
